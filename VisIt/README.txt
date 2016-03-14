@@ -3,7 +3,6 @@ I have run this procedure on my Linux desktop
 run whatever initialization sh script you have to correctly initialize VisIt.
 Mine is in visit210.sh
 
-xml2cmake AMAZE.xml
 xml2plugin AMAZE.xml
 ccmake .
 
@@ -15,3 +14,6 @@ make
 
 In order to find hdf5.h, your VisIt installation needs to INSTALL the 3-rd party:
 VISIT_INSTALL_THIRD_PARTY=ON
+
+Cleanup:
+rm -rf cmake_install.cmake Makefile CMakeFiles CMakeCache.txt  *PluginInfo*

@@ -370,8 +370,13 @@ avtAMAZEFileFormat::GetMesh(int domain, const char *meshname)
       break;
 
       case DCR_Cart2Spheres:
-      cerr << "ReadStructuredGrid2("<<domain<<")\n";
+      //cerr << "ReadStructuredGrid2("<<domain<<")\n";
       return this->myreader->ReadStructuredGrid2(domain);
+      break;
+
+      case Simple_Sphere:
+      //cerr << "ReadStructuredGrid3("<<domain<<")\n";
+      return this->myreader->ReadStructuredGrid3(domain);
       break;
       }
     }

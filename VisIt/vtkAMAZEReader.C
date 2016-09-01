@@ -713,6 +713,7 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
       cerr << "error opening Map_Parameter\n";
       }
     switch(this->MappedGrids) {
+      case Simple_Sphere:
       case Sphere_LogR:
       label1 = H5Tcopy(H5T_C_S1);
       H5Tset_size(label1, 15);
@@ -735,14 +736,14 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
         cerr << "error reading Map_Parameter\n";
         }
 /*
-      cerr << "\nparam =\t" << param[0].label << "\n\t";
-      cerr << param[0].Rmin<< "\n\t";
-      cerr << param[0].Rmax << "\n\t";
-      cerr << param[0].Tmin << "\n\t";
-      cerr << param[0].Tmax << "\n\t";
-      cerr << param[0].Pmin << "\n\t";
-      cerr << param[0].Pmax << "\n\t";
-      cerr << param[0].StretchFactorOBSOLETE << "\n\n";
+      cerr << "\nparam =\t" << SphereLogRMappings[1].label << "\n\t";
+      cerr << SphereLogRMappings[1].Rmin<< "\n\t";
+      cerr << SphereLogRMappings[1].Rmax << "\n\t";
+      cerr << SphereLogRMappings[1].Tmin << "\n\t";
+      cerr << SphereLogRMappings[1].Tmax << "\n\t";
+      cerr << SphereLogRMappings[1].Pmin << "\n\t";
+      cerr << SphereLogRMappings[1].Pmax << "\n\t";
+      cerr << SphereLogRMappings[1].StretchFactorOBSOLETE << "\n\n";
 */
       break;
       
@@ -942,6 +943,11 @@ void vtkAMAZEReader::ReadHDF5MetaData()
       this->MappedGrids = DCR_Cart2Spheres;
       cerr << "Using Mapped Grids:" << this->MappedGrids << endl;
       }
+    else if(!strncmp(map_type, "Simple-Sphere", 13))
+      {
+      this->MappedGrids = Simple_Sphere;
+      cerr << "Using Mapped Grids:" << this->MappedGrids << endl;
+      }
     status = H5Aclose(attr1);
     status = H5Gclose(map_id);
     }
@@ -1000,7 +1006,7 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
   vtkDoubleArray*scalars = vtkDoubleArray::New();
   scalars->SetNumberOfComponents(variable.vec_len == 2? 3 : variable.vec_len);
   scalars->SetName((const char*)PVlabels[(const char *)variable.label].c_str());
-  cerr << __LINE__ << ": SetName( " << PVlabels[(const char *)variable.label] << ")\n";
+//cerr << __LINE__ << ": SetName( " << PVlabels[(const char *)variable.label] << ")\n";
 // default naming. Could be over-written by "Log10()"
 
   int nvals;
@@ -1319,6 +1325,98 @@ vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid(int domain)
 
   return sg;
 } // ReadStructuredGrid
+
+vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid3(int domain)
+{
+  int I, nvals, levelId, blockId;
+  double x, y, z;
+  adG_grid grid = this->Grids[domain];
+  this->FindLevelAndBlock(domain, levelId, blockId);
+  double dx[3]; // spacing is constant at a given level
+  dx[0] = this->Levels[levelId].DXs[0];
+  dx[1] = this->Levels[levelId].DXs[1];
+  dx[2] = this->Levels[levelId].DXs[2];
+
+/*
+  cerr << "Phi ranges from "    << grid.origin[2] << " to " << grid.origin[5] << " with increment " << dx[2] << endl;
+  cerr << "Theta ranges from "  << grid.origin[1] << " to " << grid.origin[4] << " with increment " << dx[1] << endl;
+  cerr << "Radius ranges from " << grid.origin[0] << " to " << grid.origin[3] << " with increment " << dx[0] << endl;
+
+*/
+  vtkCharArray *nameArray = vtkCharArray::New();
+  nameArray->SetName("Name");
+  char *name = nameArray->WritePointer(0, 20);
+  sprintf(name, "Grid %d", grid.grid_nr);
+
+  vtkStructuredGrid* sg = vtkStructuredGrid::New();
+  sg->GetFieldData()->AddArray(nameArray);
+  nameArray->Delete();
+  vtkDoubleArray *data = vtkDoubleArray::New();
+  data->SetName("Time");
+  data->InsertValue(0, this->Time);
+  sg->GetFieldData()->AddArray(data);
+  data->Delete();
+
+  sg->SetDimensions(grid.dimensions[0],
+                    grid.dimensions[1],
+                    grid.dimensions[2]);
+  nvals = grid.dimensions[0] * grid.dimensions[1] * grid.dimensions[2];
+
+  vtkDoubleArray *coords = vtkDoubleArray::New();
+  coords->SetNumberOfComponents(3);
+  coords->SetNumberOfTuples(nvals);
+
+/*
+  if(this->LengthScale)
+    {
+    dx[0] = dx[0]/this->LengthScaleFactor;
+    dx[1] = dx[1]/this->LengthScaleFactor;
+    dx[2] = dx[2]/this->LengthScaleFactor;
+    }
+*/
+  int Iphi, Itheta, Iradius;
+
+  double NLevel_R = (1.0 - 0.0) / dx[0];
+  //cerr << "NLevel_R " << NLevel_R << endl;
+
+  double Delta_Level_R = (this->SphereLogRMappings[1].Rmax - this->SphereLogRMappings[1].Rmin)/((1.0 - 0.0) / dx[0]);
+  //cerr << "Delta_Level_R " << Delta_Level_R << endl;
+  double Delta_Level_T = (this->SphereLogRMappings[1].Tmax - this->SphereLogRMappings[1].Tmin)/((1.0 - 0.0) / dx[1]);
+  //cerr << "Delta_Level_T " << Delta_Level_T << endl;
+  double Delta_Level_P = (this->SphereLogRMappings[1].Pmax - this->SphereLogRMappings[1].Pmin)/((1.0 - 0.0) / dx[2]);
+  //cerr << "Delta_Level_P " << Delta_Level_P << endl;
+
+  for(Iphi=0; Iphi < grid.dimensions[2]; Iphi++)
+    {
+    double arg_phi = this->SphereLogRMappings[1].Pmin + (grid.box_corners[2] + Iphi)*Delta_Level_P;
+    for(Itheta=0; Itheta < grid.dimensions[1]; Itheta++)
+      {
+      double arg_theta = this->SphereLogRMappings[1].Tmin + (grid.box_corners[1] + Itheta)*Delta_Level_T;
+// so the fastest index is the radial index. 
+// cell 0 is at the lower right corner of the 2D map, and then the theta sweep goes from 0 to PI in counter-clockwise fashion
+      I = Iphi*(grid.dimensions[1]*grid.dimensions[0]) + Itheta*grid.dimensions[0];
+      for(Iradius=0; Iradius < grid.dimensions[0]; Iradius++)
+        {
+        //if(Itheta==0)
+          //cerr << this->SphereLogRMappings[1].Rmin + (grid.box_corners[0] + Iradius)*Delta_Level_R << "\n";
+        double R = this->SphereLogRMappings[1].Rmin + (grid.box_corners[0] + Iradius)*Delta_Level_R;
+        R /= this->LengthScaleFactor;
+        map_rtp2xyz(R, arg_theta, arg_phi, &x, &y, &z);
+        coords->SetTuple3(I+Iradius, x, y, z);
+        }
+        //if(Itheta==0)
+          //cerr << endl;
+      }
+    }
+
+  vtkPoints *points = vtkPoints::New();
+  points->SetData(coords);
+  coords->Delete();
+  sg->SetPoints(points);
+  points->Delete();
+
+  return sg;
+} // ReadStructuredGrid3
 
 void
 map_c2p_fig31(double xc, double yc, double zc, double R1,

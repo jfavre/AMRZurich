@@ -12,7 +12,7 @@ class vtkStructuredGrid;
 class vtkDoubleArray;
 class vtkDataArray;
 enum ScaleOption {pc=0, AU, RSun, NoScale};
-enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres};
+enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres, Simple_Sphere};
 //enum Lunarity    {FULL=0, HALF=1, QUARTER=2}
 #include <vector> // Needed for vector ivar
 #include <map>
@@ -185,6 +185,7 @@ public:
   vtkRectilinearGrid* ReadRectilinearGrid(int domain);
   vtkStructuredGrid* ReadStructuredGrid(int domain);  // for Sphere_LogR
   vtkStructuredGrid* ReadStructuredGrid2(int domain); // for DCR_Cart2Spheres
+  vtkStructuredGrid* ReadStructuredGrid3(int domain); // for Simple-Spheres
   vtkDoubleArray* ReadVisItVar(int domain, const char *varname);
   vtkDoubleArray* ReadVar(int levelId, int block, adG_component&);
   int CheckVarSize(int levelId, int block, adG_component &variable);

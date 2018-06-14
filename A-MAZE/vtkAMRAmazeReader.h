@@ -10,7 +10,6 @@ class vtkAMRBox;
 class vtkUniformGrid;
 class vtkDoubleArray;
 
-#include "vtkIOAMRModule.h" // For export macro
 #include "vtkAMRBaseReader.h"
 #include "vtkAMRAmazeReaderInternal.h"
 #include <vector> // Needed for vector ivar
@@ -69,20 +68,9 @@ public:
   vtkSetMacro(DataScale, int);
   vtkGetMacro(DataScale, int);
   vtkBooleanMacro(DataScale, int);
-
-  //vtkGetObjectMacro(PointDataArraySelection, vtkDataArraySelection);
-/*
-  int GetNumberOfPointArrays();
-  const char* GetPointArrayName(int index);
-  int GetPointArrayStatus(const char* name);
-  void SetPointArrayStatus(const char* name, int status);
-  void DisableAll();  
-  void EnableAll();
-  void Disable(const char* name);  
-  void Enable(const char* name);
-*/ 
+ 
   vtkMultiBlockDataSet* GetStarsOutput();
-  int LoadStars(hid_t root_id, vtkMultiBlockDataSet*);
+  int LoadStars(vtkMultiBlockDataSet*);
   int GridsPerLevels(int l){return myreader->Levels[l].GridsPerLevel;};
   vtkSetMacro(MaximumLevelsToReadByDefault, unsigned int);
   vtkGetMacro(MaximumLevelsToReadByDefault, unsigned int);
@@ -92,11 +80,15 @@ protected:
   vtkAMRAmazeReader();
   ~vtkAMRAmazeReader();
 
-   virtual int RequestInformation(
+  int RequestData(
+      vtkInformation* vtkNotUsed(request),
+      vtkInformationVector** vtkNotUsed(inputVector),
+      vtkInformationVector* outputVector ) override;
+  int RequestInformation(
       vtkInformation* rqst,
       vtkInformationVector** inputVector,
       vtkInformationVector* outputVector );
-  virtual int FillOutputPortInformation(int port, vtkInformation* info);
+  int FillOutputPortInformation(int port, vtkInformation* info);
 
   // The input file's name.
   hid_t file_id;

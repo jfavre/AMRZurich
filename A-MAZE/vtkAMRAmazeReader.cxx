@@ -23,7 +23,7 @@
 #include "vtkPoints.h"
 
 #include "vtkMultiBlockDataSet.h"
-
+#include "vtkStringArray.h"
 
 #include "vtkTimerLog.h"
 #include "vtkAMRUtilities.h"
@@ -43,7 +43,6 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
   this->DataScaleOn();
   this->ShiftedGridOff();
-  //this->PointDataArraySelection = vtkDataArraySelection::New();
   this->DebugOff();
   this->MaxLevelWrite = -1;
 
@@ -94,7 +93,7 @@ void vtkAMRAmazeReader::SetScaleChoice(int _arg)
     {
     this->ScaleChoice = _arg;
     this->myreader->SetScaleChoice(_arg);
-    cerr << __LINE__ << ": SetScaleChoice(" << _arg << ")\n";
+    //cerr << __LINE__ << ": SetScaleChoice(" << _arg << ")\n";
     this->Modified();
     }
 }
@@ -111,23 +110,18 @@ void vtkAMRAmazeReader::SetLengthScale(int _arg)
 
 int vtkAMRAmazeReader::CanReadFile(const char* fname )
 {
+  int ret = 0;
   if (! fname )
-    return 0;
-  cerr << __LINE__ << ": CanReadFile(" << fname << ")\n";
+    return ret;
+  //cerr << __LINE__ << ": CanReadFile(" << fname << ")\n";
   hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
   hid_t root_id = H5Gopen(f_id, "/");
   if(H5Lexists(root_id, "/Grid Info", H5P_DEFAULT))
-    {
-      H5Gclose(root_id);
-      H5Fclose(f_id);
-      return 1;
-    }
-  else
-    {
-    H5Gclose(root_id);
-    H5Fclose(f_id);
-    return 0;
-    }
+    ret = 1;
+
+  H5Gclose(root_id);
+  H5Fclose(f_id);
+  return ret;
 }
 
 void vtkAMRAmazeReader::SetFileName( const char* fileName )
@@ -159,12 +153,12 @@ void vtkAMRAmazeReader::SetFileName( const char* fileName )
   this->Modified();
 }
 
-
 int vtkAMRAmazeReader::RequestInformation(
   vtkInformation* request, 
   vtkInformationVector** inputVector, 
   vtkInformationVector* outputVector)
 {
+  //cerr << __LINE__ << " vtkAMRAmazeReader::RequestInformation\n";
   if (!this->Superclass::RequestInformation(request, inputVector, outputVector))
     {
     return 0;
@@ -173,8 +167,37 @@ int vtkAMRAmazeReader::RequestInformation(
   return 1;
 }
 
-int vtkAMRAmazeReader::LoadStars(hid_t root_id,
-                                vtkMultiBlockDataSet* SpherSymStars)
+int vtkAMRAmazeReader::RequestData(
+      vtkInformation* request,
+      vtkInformationVector** inputVector,
+      vtkInformationVector* outputVector)
+{
+  //cerr << __LINE__ << " vtkAMRAmazeReader::RequestData\n";
+  if (!this->Superclass::RequestData(request, inputVector, outputVector))
+    {
+    return 0;
+    }
+  vtkInformation* info = outputVector->GetInformationObject(0);
+  int piece = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER());
+  if(piece == 0)// should only proc 0 read the stars?
+    {
+    //cerr << "vtkAMRAmazeReader::RequestData() Load stars\n\n";
+    info = outputVector->GetInformationObject(1);
+    vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
+    if (!output2)
+      {
+      cerr << "did not get a correct output2 object\n";
+      }
+    else
+      {
+      //cerr << __LINE__ << " vtkAMRAmazeReader::LoadStars\n";
+      int nb_stars = vtkAMRAmazeReader::LoadStars(output2);
+      }
+    }
+  return 1;
+}
+
+int vtkAMRAmazeReader::LoadStars(vtkMultiBlockDataSet* SpherSymStars)
 {
   hid_t    dataset1, dataset2, StarsDS;
   hid_t    attr1, attr2;
@@ -192,11 +215,11 @@ int vtkAMRAmazeReader::LoadStars(hid_t root_id,
   for(int i=0; i < this->myreader->NumberOfSphericallySymmetricStars+this->myreader->NumberOfAxisSymmetricStars; i++)
     {
     SpherSymStars->SetBlock(i, this->myreader->Stars[i]);
+    vtkStringArray *mna = vtkStringArray::SafeDownCast(this->myreader->Stars[i]->GetFieldData()->GetAbstractArray("InteractionModel"));
 
-    SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->myreader->Stars[i]->GetFieldData()->GetArray(0)->GetName());
+    SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), mna->GetValue(0));
     }
 
-  //H5Gclose(apr_root_id);
   H5Eset_auto(func, client_data);
   return nb_stars;
 }
@@ -227,6 +250,7 @@ void vtkAMRAmazeReader::PrintSelf(ostream& os, vtkIndent indent)
 
 int vtkAMRAmazeReader::FillOutputPortInformation(int port, vtkInformation* info)
 {
+  //cerr << __LINE__ << " vtkAMRAmazeReader::FillOutputPortInformation port = "  << port  << endl;
   if(port == 0)
     info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkHierarchicalBoxDataSet");
   if(port == 1)
@@ -268,7 +292,7 @@ void vtkAMRAmazeReader::SetUpDataArraySelections()
 
   for(int i=0; i < this->GetNumberOfComponents(); i++)
     {
-    cerr << __LINE__ << " PointDataArraySelection->AddArray(" << this->myreader->Labels[i].label << ")\n";
+    //cerr << __LINE__ << " PointDataArraySelection->AddArray(" << this->myreader->Labels[i].label << ")\n";
     this->PointDataArraySelection->AddArray((const char *)this->myreader->Labels[i].label);
     int count = strcspn((const char *)this->myreader->Labels[i].unit, " "); // count how many characters in unit different than " "
     this->myreader->Labels[i].unit[count] = '\0';
@@ -286,7 +310,7 @@ int vtkAMRAmazeReader::FillMetaData( )
     blocksPerLevel[levelId] = this->GridsPerLevels(levelId);
     }
 
-  cerr << __LINE__ << " FillMetaData( levels=" << this->GetNumberOfLevels() << ")\n";
+  //cerr << __LINE__ << " FillMetaData( levels=" << this->GetNumberOfLevels() << ")\n";
   this->Metadata->Initialize(this->GetNumberOfLevels(), blocksPerLevel);
   if(this->myreader->GetDimensionality() == 2)
     this->Metadata->SetGridDescription(VTK_XY_PLANE);
@@ -304,7 +328,7 @@ int vtkAMRAmazeReader::FillMetaData( )
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
     {
     this->myreader->GetSpacing(levelId, spacing);
-    cerr << "Metadata->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
+    //cerr << __LINE__ << " :Metadata->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
     this->Metadata->SetSpacing(levelId, spacing);
     for (GridId=0; GridId < this->GridsPerLevels(levelId); GridId++)
       {
@@ -352,6 +376,8 @@ void vtkAMRAmazeReader::GetAMRGridPointData(const int blockIdx, vtkUniformGrid *
   data->Delete();
 }
 
+
+// ANYTHING BELOW HERE is OLD
 #ifdef OLD
 //----------------------------------------------------------------------------
 int vtkAMRAmazeReader::RequestInformation(
@@ -776,4 +802,4 @@ void vtkAMRAmazeReader::DisableAll()
 {
   this->PointDataArraySelection->DisableAllArrays();
 }
-#endif
+#endif  // OLD stuff

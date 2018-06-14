@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     cerr << "Usage: TestAMAZEReader   *amr5\n"; exit(1);
     }
 
-
+  cerr << "Testing AmazeReaderInternal (begin)" << endl;
   vtkAMRAmazeReaderInternal *reader = vtkAMRAmazeReaderInternal::New();
   reader->SetFileName(argv[1]);
   reader->ReadMetaData();
@@ -34,19 +34,21 @@ int main(int argc, char **argv)
     }
 */
   reader->Delete();
-/*
+  cerr << "Testing AmazeReaderInternal (end)" << endl;
+  cerr << "#################################\n";
+  cerr << "Testing AmazeReader (begin)" << endl;
   vtkAMRAmazeReader *Reader = vtkAMRAmazeReader::New();
   Reader->SetFileName(argv[1]);
-  Reader->CanReadFile(argv[1]);
+  int canRead = Reader->CanReadFile(argv[1]);
   Reader->DataScaleOn();
   Reader->SetLengthScale(1);
   Reader->SetScaleChoice(3);
   Reader->LogDataOn();
-  //Reader->SetPointArrayStatus("Density", 1);
+  Reader->SetPointArrayStatus("Density", 1);
   Reader->SetMaxLevel(2);
   //Reader->UpdateInformation();
   Reader->Update();
   Reader->Delete();
-*/
+  cerr << "Testing AmazeReader (end)" << endl;
   return 0;
 }

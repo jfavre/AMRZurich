@@ -89,7 +89,7 @@ typedef struct newstar
   double CompRadiusFrac;
   double Mass;
   char   SpectralType[100];
-  float  Position[3];
+  double  Position[3];
   double  Velocity[3];
   char   StarModel[100];
   char   StellarEvolution[100];

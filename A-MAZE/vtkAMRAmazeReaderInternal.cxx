@@ -119,7 +119,7 @@ static hid_t Create_NewStar_Compound()
                 H5Tset_strpad(labelstring, H5T_STR_NULLTERM);
 
   dim[0] = 3;
-  array1_id = H5Tarray_create(H5T_NATIVE_FLOAT, 1, dim, NULL);
+  array1_id = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim, NULL);
 
   id = H5Tcreate(H5T_COMPOUND, sizeof(newstar));
   H5Tinsert(id, "StarTime [y]",             HOFFSET(newstar, StarTime), H5T_NATIVE_DOUBLE);
@@ -422,7 +422,7 @@ vtkPolyData * vtkAMRAmazeReaderInternal::AxisSymStarSource(newstar *astar,
   AxiSymStar->GetFieldData()->AddArray(mass);
 
   mass->SetValue(0, astar->Mass);
-  velo->SetTupleValue(0, astar->Velocity);
+  velo->SetTypedTuple(0, astar->Velocity);
   velo->Delete();
   mass->Delete();
 
@@ -488,7 +488,7 @@ vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
 void vtkAMRAmazeReaderInternal::SetFileName(char * fileName )
 {
   this->FileName = fileName;
-  cerr << __LINE__ << " Settting this->Filename = " << fileName << "\n";
+  //cerr << __LINE__ << " Settting this->Filename = " << fileName << "\n";
 }
 
 //----------------------------------------------------------------------------
@@ -513,7 +513,7 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
     }
   OpenHDF5File("ReadMetaData");
   this->ReadHDF5MetaData();
-  cerr << "done with ReadHDF5MetaData() " << endl;
+  //cerr << "done with ReadHDF5MetaData() " << endl;
   this->SetTime(this->GetTime() / this->TimeScalor);
 
   //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &this->Time, 1);
@@ -539,11 +539,7 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
 
   for (i = 0; i < this->NumberOfGrids; i++)
     {
-#ifdef VTK5
-    this->Grids[i].amrbox = vtkAMRBox(this->Dimensionality, grid[i].box_corners, grid[i].box_corners+3);
-#else
     this->Grids[i].amrbox = vtkAMRBox(grid[i].box_corners, grid[i].box_corners+3);
-#endif
     if(this->Grids[i].level != current_level)
       { // first grid of a given level
       current_level = this->Grids[i].level;
@@ -635,7 +631,7 @@ int vtkAMRAmazeReaderInternal::OpenHDF5File(const char *funcName)
       this->file_id = 0;
       return -1;
       }
-    cerr << funcName << "::H5Fopen(" << this->FileName << ")\n";
+    //cerr << funcName << "::H5Fopen(" << this->FileName << ")\n";
     }
   return 0;
 }
@@ -646,7 +642,7 @@ void vtkAMRAmazeReaderInternal::CloseHDF5File(const char *funcName)
     {
     H5Fclose(this->file_id);
     this->file_id = 0;
-    cerr << funcName << "::H5Fclose()\n";
+    //cerr << funcName << "::H5Fclose()\n";
   }
 }
 
@@ -886,7 +882,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5VariablesMetaData()
 // so we make this a separate call
 void vtkAMRAmazeReaderInternal::MakeVariableNames()
 {
-  cerr << __LINE__ << " MakeVariableNames()\n";
+  //cerr << __LINE__ << " MakeVariableNames()\n";
   for(int c=0; c < this->NumberOfComponents; c++)
     {
     std::ostringstream varName;
@@ -977,7 +973,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
          cerr << __LINE__ << "   Using RSun with Length Scale Factor * by 6.96342e10 = " << this->LengthScaleFactor << "\n";
         break;
         case 3:
-          cerr << __LINE__ << "   Length Scale Factor  is untouched\n";
+          //cerr << __LINE__ << "   Length Scale Factor  is untouched\n";
         break;
         }
 
@@ -2005,6 +2001,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
 
   if(apr_root_id < 0)
     {
+    cerr << __LINE__ << "/APR_StellarSystems not found in HDF5 file\n";
     return 0;
     }
   interactions_root_id = H5Gopen(apr_root_id, "Interactions");
@@ -2037,7 +2034,11 @@ int vtkAMRAmazeReaderInternal::BuildStars()
     }
 
   models_root_id = H5Gopen(apr_root_id, "Stars");
-
+  if(models_root_id < 0)
+    {
+    cerr << __LINE__ << "/APR_StellarSystems/Stars not found in HDF5 file\n";
+    return 0;
+    }
   hid_t dataspace;
   int ModelsArraySize;
   hsize_t dims_out[1]; // we assume rank = 1
@@ -2075,7 +2076,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
 
     H5Tclose(attr2);
     H5Dclose(dataset2);
-    //cout << "Found " << nb_stars << " stars\n";
+    cerr << __LINE__ << " :Found " << nb_stars << " stars\n";
 
     for (i=0; i < nb_stars; i++)
       {
@@ -2137,9 +2138,9 @@ int vtkAMRAmazeReaderInternal::BuildStars()
       ss->SetRadius(stars[i].Radius);
       cerr << "radius = "<< stars[i].Radius << endl;
       ss->Update();
-      for(int k=0; k < THETARES*(PHIRES-2)+2; k++)
+      for(vtkIdType k=0; k < THETARES*(PHIRES-2)+2; k++)
         {
-        velo->SetTupleValue(k, stars[i].Velocity);
+        velo->SetTypedTuple(k, stars[i].Velocity);
         mass->SetValue(k, stars[i].Mass);
         if(this->LogData)
           temp->SetValue(k, log10(stars[i].Temperature));
@@ -2185,7 +2186,6 @@ for(int i=0; i < this->Stars.size(); i++)
 
     for(i=0; i < nb_stars; i++)
       {
-/*
       cerr << "star " << i << endl
            << "  StarTime "             << newstars[i].StarTime  << endl
            << "  CompRadiusFrac "       << newstars[i].CompRadiusFrac  << endl
@@ -2200,14 +2200,14 @@ for(int i=0; i < this->Stars.size(); i++)
            << "  IActionEvolution "     << newstars[i].IActionEvolution  << endl
            << "  IActionModelFileName " << newstars[i].IActionModelFileName  << endl
            << endl;
-*/
+
       if(strstr(newstars[i].StarModel, "SpherSymStar"))
         NumberOfSphericallySymmetricStars++;
       else
         NumberOfAxisSymmetricStars++;
       }
 
-    //cerr << "1548 found " << this->NumberOfSphericallySymmetricStars << " spheric-symmetric stars, and " << this->NumberOfAxisSymmetricStars << " axis-symmetric stars\n";
+    cerr << __LINE__ << " :found " << this->NumberOfSphericallySymmetricStars << " spheric-symmetric stars, and " << this->NumberOfAxisSymmetricStars << " axis-symmetric stars\n";
     H5Tclose(attr2);
 
     if(this->NumberOfSphericallySymmetricStars)
@@ -2230,14 +2230,14 @@ for(int i=0; i < this->Stars.size(); i++)
             {
             status = H5Dread(starN_DS, SpherSymStarCurrent_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, spherStarData);
             H5Dclose(starN_DS);
-/*
+
            cerr
            << spherStarData->Radius  << "\t"
            << spherStarData->Temperature  << "\t"
            << spherStarData->Luminosity  << "\t"
            << spherStarData->Omega[0]  << ", " << spherStarData->Omega[1]  << ", " << spherStarData->Omega[2] << "\t"
            << spherStarData->BField[0]  << ", " << spherStarData->BField[1]  << ", " << spherStarData->BField[2]<< endl;
-*/
+
             Radius = spherStarData->Radius;
             }
           else
@@ -2253,20 +2253,24 @@ for(int i=0; i < this->Stars.size(); i++)
         velo->SetNumberOfComponents(3);
         velo->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
         velo->SetName("Velocity");
+
         vtkDoubleArray *mass = vtkDoubleArray::New();
         mass->SetNumberOfComponents(1);
         mass->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
         mass->SetName("Mass");
+
         char *p = strchr(newstars[i].InteractionModel, ' ');
         *p = '\0';
         vtkStringArray *name = vtkStringArray::New();
         name->SetNumberOfComponents(1);
         name->SetNumberOfTuples(1);
+        name->SetName("InteractionModel");
         name->SetValue(0, newstars[i].InteractionModel);
 
         vtkSphereSource *ss = vtkSphereSource::New();
         ss->SetThetaResolution(THETARES);
         ss->SetPhiResolution(PHIRES);
+        ss->SetOutputPointsPrecision(vtkAlgorithm::DOUBLE_PRECISION);
         if(strstr(newstars[i].StarModel, "SpherSymStar"))
           {
           double c[3];
@@ -2275,28 +2279,27 @@ for(int i=0; i < this->Stars.size(); i++)
             ss->SetCenter(newstars[i].Position[0]/this->LengthScaleFactor,
                           newstars[i].Position[1]/this->LengthScaleFactor,
                           newstars[i].Position[2]/this->LengthScaleFactor);
-            ss->GetCenter(c);
-            //ss->SetCenter(newstars[i].Position[0],
-                          //newstars[i].Position[1],
-                          //newstars[i].Position[2]);
             }
           else
             {
             ss->SetCenter(newstars[i].Position[0],
                           newstars[i].Position[1],
                           newstars[i].Position[2]);
-            ss->GetCenter(c);
             }
+          ss->GetCenter(c);
 cerr.precision(15);
-cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] << " " << c[2] << " ";
-
+cerr<< newstars[i].InteractionModel << " Position =  "<< c[0] << " " << c[1] << " " << c[2] << " " << ", compRadiusFrac "<< newstars[i].CompRadiusFrac ;
+          if(i == 0)
+             Radius = .1;
+          else
+             Radius=8;
           ss->SetRadius(Radius * newstars[i].CompRadiusFrac * 6.96e10 /this->LengthScaleFactor );
           cerr<<"and Radius = "<< ss->GetRadius() << "\n\n";
           }
         ss->Update();
-        for(int k=0; k < THETARES*(PHIRES-2)+2; k++)
+        for(vtkIdType k=0; k < THETARES*(PHIRES-2)+2; k++)
           {
-          velo->SetTupleValue(k, newstars[i].Velocity);
+          velo->SetTypedTuple(k, newstars[i].Velocity);
           mass->SetValue(k, newstars[i].Mass);
           }
         ss->GetOutput()->GetFieldData()->AddArray(name);
@@ -2399,11 +2402,7 @@ cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] 
             tf->RotateX(90.0);
             vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
             tfpd->SetTransform(tf);
-#ifdef VTK5
-            tfpd->SetInput(AxiSymStar);
-#else
             tfpd->SetInputData(AxiSymStar);
-#endif
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
@@ -2417,11 +2416,7 @@ cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] 
             tf->RotateY(90.0);
             vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
             tfpd->SetTransform(tf);
-#ifdef VTK5
-            tfpd->SetInput(AxiSymStar);
-#else
             tfpd->SetInputData(AxiSymStar);
-#endif
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
@@ -2444,23 +2439,23 @@ cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] 
   H5Gclose(models_root_id);
 
   H5Gclose(apr_root_id);
-  CloseHDF5File("BuildStars");
+  //CloseHDF5File("BuildStars");
   H5Eset_auto(func, client_data);
-  //cerr << "exitBuildStars() with " << this->NumberOfSphericallySymmetricStars << " spheric-symmetric stars, and " << this->NumberOfAxisSymmetricStars << " axis-symmetric stars\n";
+  //cerr << __LINE__ << " :exit BuildStars() with " << this->NumberOfSphericallySymmetricStars << " spheric-symmetric stars, and " << this->NumberOfAxisSymmetricStars << " axis-symmetric stars\n";
 
   return nb_stars;
-}
+} // ::BuildStars
 
 /*
 for(int i=0; i < this->Stars.size(); i++)
-{
-vtkDataSetWriter *writer = vtkDataSetWriter::New();
-writer->SetInput(this->Stars[i]);
-char f[65];
-sprintf(f,"/tmp/tmp/foo.%02d.vtk", i);
-cerr << "writing " << this->Stars[i]->GetNumberOfPoints() << " to disk\n";
-writer->SetFileName((const char*)f);
-writer->Write();
-writer->Delete();
+  {
+  vtkDataSetWriter *writer = vtkDataSetWriter::New();
+  writer->SetInputData(this->Stars[i]);
+  char f[65];
+  sprintf(f,"/tmp/tmp/foo.%02d.vtk", i);
+  cerr << "writing " << this->Stars[i]->GetNumberOfPoints() << " to disk\n";
+  writer->SetFileName((const char*)f);
+  writer->Write();
+  writer->Delete();
 } 
 */

@@ -2251,13 +2251,22 @@ for(int i=0; i < this->Stars.size(); i++)
 
         vtkDoubleArray *velo = vtkDoubleArray::New();
         velo->SetNumberOfComponents(3);
-        velo->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+        velo->SetNumberOfTuples(1);
         velo->SetName("Velocity");
 
         vtkDoubleArray *mass = vtkDoubleArray::New();
         mass->SetNumberOfComponents(1);
-        mass->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+        mass->SetNumberOfTuples(1);
         mass->SetName("Mass");
+
+        vtkDoubleArray *radius = vtkDoubleArray::New();
+        radius->SetNumberOfComponents(1);
+        radius->SetNumberOfTuples(1);
+        radius->SetName("Radius");
+
+        velo->SetTypedTuple(0, newstars[i].Velocity);
+        mass->SetValue(0, newstars[i].Mass);
+
 
         char *p = strchr(newstars[i].InteractionModel, ' ');
         *p = '\0';
@@ -2267,49 +2276,42 @@ for(int i=0; i < this->Stars.size(); i++)
         name->SetName("InteractionModel");
         name->SetValue(0, newstars[i].InteractionModel);
 
-        vtkSphereSource *ss = vtkSphereSource::New();
-        ss->SetThetaResolution(THETARES);
-        ss->SetPhiResolution(PHIRES);
-        ss->SetOutputPointsPrecision(vtkAlgorithm::DOUBLE_PRECISION);
+        //vtkSphereSource *ss = vtkSphereSource::New();
+        vtkPolyData *ss = vtkPolyData::New();
+        vtkPoints   *starpts = vtkPoints::New();
+        ss->SetPoints(starpts);
+        starpts->Delete();
+        starpts->SetNumberOfPoints(1);
+
         if(strstr(newstars[i].StarModel, "SpherSymStar"))
           {
-          double c[3];
           if(this->LengthScale)
             {
-            ss->SetCenter(newstars[i].Position[0]/this->LengthScaleFactor,
+            starpts->SetPoint(0, newstars[i].Position[0]/this->LengthScaleFactor,
                           newstars[i].Position[1]/this->LengthScaleFactor,
                           newstars[i].Position[2]/this->LengthScaleFactor);
             }
           else
             {
-            ss->SetCenter(newstars[i].Position[0],
+            starpts->SetPoint(0, newstars[i].Position[0],
                           newstars[i].Position[1],
                           newstars[i].Position[2]);
             }
-          ss->GetCenter(c);
-cerr.precision(15);
-cerr<< newstars[i].InteractionModel << " Position =  "<< c[0] << " " << c[1] << " " << c[2] << " " << ", compRadiusFrac "<< newstars[i].CompRadiusFrac ;
-          if(i == 0)
-             Radius = .1;
-          else
-             Radius=8;
-          ss->SetRadius(Radius * newstars[i].CompRadiusFrac * 6.96e10 /this->LengthScaleFactor );
-          cerr<<"and Radius = "<< ss->GetRadius() << "\n\n";
+
+          radius->SetValue(0, Radius * newstars[i].CompRadiusFrac * 6.96e10 /this->LengthScaleFactor);
           }
-        ss->Update();
-        for(vtkIdType k=0; k < THETARES*(PHIRES-2)+2; k++)
-          {
-          velo->SetTypedTuple(k, newstars[i].Velocity);
-          mass->SetValue(k, newstars[i].Mass);
-          }
-        ss->GetOutput()->GetFieldData()->AddArray(name);
-        ss->GetOutput()->GetPointData()->AddArray(velo);
-        ss->GetOutput()->GetPointData()->AddArray(mass);
+        vtkIdType pts[1]={0};
+        ss->Allocate(1, 1);
+        ss->InsertNextCell(VTK_VERTEX, 1, pts);
+        ss->GetFieldData()->AddArray(name);
+        ss->GetPointData()->AddArray(velo);
+        ss->GetPointData()->AddArray(mass);
+        ss->GetPointData()->AddArray(radius);
         name->Delete();
         mass->Delete();
         velo->Delete();
-        this->Stars.push_back(ss->GetOutput());
-        //ss->Delete();
+        radius->Delete();
+        this->Stars.push_back(ss);
         }
       delete spherStarData;
       H5Tclose(SpherSymStarCurrent_id);

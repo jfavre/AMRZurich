@@ -16,4 +16,4 @@ In order to find hdf5.h, your VisIt installation needs to INSTALL the 3-rd party
 VISIT_INSTALL_THIRD_PARTY=ON
 
 Cleanup:
-rm -rf cmake_install.cmake Makefile CMakeFiles CMakeCache.txt  *PluginInfo*
+rm -rf cmake_install.cmake Makefile CMakeFiles CMakeCache.txt  *PluginInfo* CMakeLists.txt

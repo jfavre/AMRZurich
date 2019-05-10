@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "vtkTimerLog.h"
-
+#include "vtkVersionMacros.h"
 //#define SINGLE_OUTPUT_PORT 1
 //#define PARALLEL_DEBUG 1
 #include <stddef.h>
@@ -424,7 +424,12 @@ vtkPolyData * vtkAMAZEReader::AxisSymStarSource(newstar *astar,
   AxiSymStar->GetFieldData()->AddArray(mass);
 
   mass->SetValue(0, astar->Mass);
+  
+#if VTK_MAJOR_VERSION == 8
+  velo->SetTypedTuple(0, astar->Velocity);
+#else
   velo->SetTupleValue(0, astar->Velocity);
+#endif
   velo->Delete();
   mass->Delete();
 
@@ -557,11 +562,7 @@ void vtkAMAZEReader::ReadMetaData()
 
   for (i = 0; i < this->NumberOfGrids; i++)
     {
-#ifdef VTK5
-    this->Grids[i].amrbox = vtkAMRBox(this->Dimensionality, grid[i].box_corners, grid[i].box_corners+3);
-#else
     this->Grids[i].amrbox = vtkAMRBox(grid[i].box_corners, grid[i].box_corners+3);
-#endif
     if(this->Grids[i].level != current_level)
       { // first grid of a given level
       current_level = this->Grids[i].level;
@@ -2167,7 +2168,11 @@ int vtkAMAZEReader::BuildStars()
       ss->Update();
       for(int k=0; k < THETARES*(PHIRES-2)+2; k++)
         {
+#if VTK_MAJOR_VERSION == 8
+        velo->SetTypedTuple(k, stars[i].Velocity);
+#else
         velo->SetTupleValue(k, stars[i].Velocity);
+#endif
         mass->SetValue(k, stars[i].Mass);
         if(this->LogData)
           temp->SetValue(k, log10(stars[i].Temperature));
@@ -2325,7 +2330,11 @@ cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] 
         ss->Update();
         for(int k=0; k < THETARES*(PHIRES-2)+2; k++)
           {
+#if VTK_MAJOR_VERSION == 8
+          velo->SetTypedTuple(k, newstars[i].Velocity);
+#else
           velo->SetTupleValue(k, newstars[i].Velocity);
+#endif
           mass->SetValue(k, newstars[i].Mass);
           }
         ss->GetOutput()->GetFieldData()->AddArray(name);
@@ -2428,11 +2437,7 @@ cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] 
             tf->RotateX(90.0);
             vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
             tfpd->SetTransform(tf);
-#ifdef VTK5
-            tfpd->SetInput(AxiSymStar);
-#else
             tfpd->SetInputData(AxiSymStar);
-#endif
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
@@ -2446,11 +2451,7 @@ cerr<< newstars[i].InteractionModel << " at Position =  "<< c[0] << " " << c[1] 
             tf->RotateY(90.0);
             vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
             tfpd->SetTransform(tf);
-#ifdef VTK5
-            tfpd->SetInput(AxiSymStar);
-#else
             tfpd->SetInputData(AxiSymStar);
-#endif
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();

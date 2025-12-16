@@ -1,0 +1,6 @@
+ADD_DEFINITIONS(-DH5_USE_16_API)
+paraview_add_plugin(pvAMAZEReader
+  REQUIRED_ON_SERVER
+  VERSION "1.0"
+  MODULES AMAZEReader
+  MODULE_FILES      "${CMAKE_CURRENT_SOURCE_DIR}/Reader/vtk.module")

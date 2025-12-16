@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+  <Plugin name="AMAZE" type="database" label="A-MAZE" version="1.0" enabled="true" mdspecificcode="false" engspecificcode="false" onlyengine="false" noengine="false" dbtype="STMD" haswriter="false" hasoptions="true" filePatternsStrict="false" opensWholeDirectory="false">
+    <CXXFLAGS>
+      -DH5_USE_16_API
+      -I${HDF5_INCLUDE_DIR}
+      -Wno-invalid-offsetof
+    </CXXFLAGS>
+    <LDFLAGS>
+      ${HDF5_LIBRARY_DIR}
+    </LDFLAGS>
+    <LIBS>
+      ${HDF5_LIB}
+    </LIBS>
+    <FilePatterns>
+      *.amr5
+    </FilePatterns>
+    <Files components="M">
+      avtAMAZEFileFormat.C
+      vtkAMRAmazeReaderInternal.cxx
+      avtAMAZEOptions.C
+    </Files>
+    <Files components="E">
+      avtAMAZEFileFormat.C
+      vtkAMRAmazeReaderInternal.cxx
+      avtAMAZEOptions.C
+    </Files>
+    <Attribute name="" purpose="" persistent="false" keyframe="true" exportAPI="" exportInclude="">
+    </Attribute>
+  </Plugin>

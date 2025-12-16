@@ -1,0 +1,80 @@
+
+==ChomboReader==
+
+
+
+{| class="PropertiesTable" border="1" cellpadding="5"
+|-
+| '''Property'''
+| '''Description'''
+| '''Default Value(s)'''
+| '''Restrictions'''
+
+|-
+|'''FileName''' (FileName)
+|
+
+|
+
+|
+The value(s) must be a filename (or filenames).
+|-
+|'''NumLevels''' (NumLevels)
+|
+
+|
+
+|
+
+|-
+|'''NumBlocks''' (NumBlocks)
+|
+
+|
+
+|
+
+|-
+|'''EnableCaching''' (EnableCaching)
+|
+Turn caching on/off
+|
+0
+|
+Accepts boolean values (0 or 1).
+|-
+|'''Level''' (Level)
+|
+This property specifies the desired level of resolution
+that will be visible.
+|
+1
+|
+
+|-
+|'''TimestepValues''' (TimestepValues)
+|
+
+|
+
+|
+
+|-
+|'''PointArrayInfo''' (PointArrayInfo)
+|
+
+|
+
+|
+
+|-
+|'''PointArrayStatus''' (PointArrayStatus)
+|
+
+|
+
+|
+The list of array names is provided by the reader.
+
+|}
+

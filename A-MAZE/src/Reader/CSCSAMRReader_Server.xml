@@ -1,0 +1,240 @@
+<ServerManagerConfiguration>
+  <ProxyGroup name="filters">
+   <SourceProxy name="SortAMRPoints" class="vtkSortAMRPoints">
+        <InputProperty
+                 name="Input"
+                 command="SetInputConnection">
+                <ProxyGroupDomain name="groups">
+                        <Group name="sources"/>
+                        <Group name="filters"/>
+                </ProxyGroupDomain>
+                <DataTypeDomain name="input_type"> <DataType value="vtkCompositeDataSet"/>
+                </DataTypeDomain>
+                <Documentation>
+                </Documentation>
+        </InputProperty>
+   </SourceProxy>
+
+<SourceProxy name="Map Fig51" class="vtkMapFig51">
+<InputProperty
+       name="Input"
+       command="SetInputConnection">
+          <ProxyGroupDomain name="groups">
+            <Group name="sources"/>
+            <Group name="filters"/>
+          </ProxyGroupDomain>
+          <DataTypeDomain name="input_type">
+            <DataType value="vtkDataSet"/>
+          </DataTypeDomain>
+          <Documentation>
+            This property specifies 
+          </Documentation>
+     </InputProperty>
+     <DoubleVectorProperty
+        name="MapCenter"
+        command="SetMapCenter"
+        number_of_elements="3"
+        default_values="2.5e19 2.5e19 2.5e19"
+        label="Map Center">
+          <Documentation>
+            The values of this property specify 
+          </Documentation>
+     </DoubleVectorProperty>
+   </SourceProxy>
+   <SourceProxy name="Extract Stars" class="vtkExtractAMRStars">
+        <InputProperty
+                 name="Input"
+                 command="SetInputConnection">
+                <ProxyGroupDomain name="groups">
+                        <Group name="sources"/>
+                        <Group name="filters"/>
+                </ProxyGroupDomain>
+                <DataTypeDomain name="input_type"> <DataType value="vtkCompositeDataSet"/>
+                </DataTypeDomain>
+                <Documentation>
+                </Documentation>
+        </InputProperty>
+   </SourceProxy>
+  </ProxyGroup>
+
+  <ProxyGroup name="sources">
+   <SourceProxy name="AMAZEReader" class="vtkCSCSAMRReader">
+    <OutputPort name="AMR" index="0" />
+    <OutputPort name="Stars" index="1" />
+     <StringVectorProperty
+        name="FileName"
+        command="SetFileName"
+        number_of_elements="1">
+        <FileListDomain name="files"/>
+     </StringVectorProperty>
+
+     <IntVectorProperty 
+        name="LevelRange"
+        command="GetLevelRange"
+        information_only="1">
+       <SimpleIntInformationHelper/>
+     </IntVectorProperty>
+		 
+     <IntVectorProperty 
+        name="LevelSet" 
+        command="SetLevelRead"
+        number_of_elements="2"
+        default_values="0 0"
+        label="Level Range">
+          <IntRangeDomain name="range">
+            <RequiredProperties>
+               <Property name="LevelRange" function="Range"/>
+            </RequiredProperties>
+          </IntRangeDomain>         
+          <Documentation>
+            The values of this property specify the upper and lower bounds of the hierarchy level.
+          </Documentation>
+     </IntVectorProperty>
+	
+     <IntVectorProperty 
+        name="LogData" 
+        command="SetLogData"
+        number_of_elements="1"
+        default_values="1"
+        label="Compute Log10">
+      <BooleanDomain name="bool" />
+      <Documentation>
+            Will compute log10() of the standard variables (density, temperature, pressure)
+      </Documentation>
+     </IntVectorProperty>
+
+     <IntVectorProperty 
+        name="ShiftedGrid" 
+        command="SetShiftedGrid"
+        number_of_elements="1"
+        default_values="0"
+        label="Shifted Grid">
+      <BooleanDomain name="bool" />
+      <Documentation>
+            ShiftedGrid is used to animate slabs in stationary position
+      </Documentation>
+     </IntVectorProperty>
+ 
+     <IntVectorProperty 
+        name="LengthScale" 
+        command="SetLengthScale"
+        number_of_elements="1"
+        default_values="1"
+        label="Apply Length Scale Factor">
+      <BooleanDomain name="bool" />
+      <Documentation>
+            Will scale the grids to Physical Scale
+      </Documentation>
+     </IntVectorProperty>
+ 
+      <IntVectorProperty command="SetScaleChoice"
+                         default_values="3"
+                         name="BoxLength"
+                         number_of_elements="1">
+        <EnumerationDomain name="enum">
+          <Entry text="pc"
+                 value="0" />
+          <Entry text="AU"
+                 value="1" />
+          <Entry text="RSun"
+                 value="2" />
+          <Entry text="No-scale"
+                 value="3" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+
+     <DoubleVectorProperty
+          name="TimestepValues"
+          information_only="1">
+          <TimeStepsInformationHelper/>
+       </DoubleVectorProperty>
+
+     <StringVectorProperty
+        name="PointArrayInfo"
+        information_only="1">
+        <ArraySelectionInformationHelper attribute_name="Point"/>
+     </StringVectorProperty>
+
+     <StringVectorProperty
+        name="PointArrayStatus"
+        command="SetPointArrayStatus"
+        number_of_elements="0"
+        repeat_command="1"
+        number_of_elements_per_command="2"
+        element_types="2 0"
+        information_property="PointArrayInfo">
+       <ArraySelectionDomain name="array_list">
+          <RequiredProperties>
+             <Property name="PointArrayInfo" function="ArrayList"/>
+          </RequiredProperties>
+       </ArraySelectionDomain>
+     </StringVectorProperty>
+
+     <Hints>
+       <ReaderFactory extensions="amr5"
+                      file_description="AMAZE Files" />
+     </Hints>
+
+   <!-- End CSCS AMR Reader -->
+   </SourceProxy>
+
+  <SourceProxy name="AMAZEListReader" class="vtkMetaAMRReader">
+     <StringVectorProperty
+        name="FileName"
+        command="SetFileName"
+        animateable="0"
+        number_of_elements="1">
+        <FileListDomain name="files"/>
+     </StringVectorProperty>
+
+     <DoubleVectorProperty
+          name="TimestepValues"
+          information_only="1">
+          <TimeStepsInformationHelper/>
+       </DoubleVectorProperty>
+
+     <StringVectorProperty
+        name="PointArrayInfo"
+        information_only="1">
+        <ArraySelectionInformationHelper attribute_name="Point"/>
+     </StringVectorProperty>
+
+     <StringVectorProperty
+        animateable="0"
+        name="PointArrayStatus"
+        command="SetPointArrayStatus"
+        number_of_elements="0"
+        repeat_command="1"
+        number_of_elements_per_command="2"
+        element_types="2 0"
+        information_property="PointArrayInfo">
+       <ArraySelectionDomain name="array_list">
+          <RequiredProperties>
+             <Property name="PointArrayInfo" function="ArrayList"/>
+          </RequiredProperties>
+       </ArraySelectionDomain>
+     </StringVectorProperty>
+   <!-- End Meta AMR (reads several timesteps but no HDF5) Reader -->
+
+     <Hints>
+       <ReaderFactory extensions="amr"
+                      file_description="List of AMAZE Files" />
+     </Hints>
+
+   </SourceProxy>
+
+  <SourceProxy name="IonizationRayReader2" class="vtkIonizationRayReader2">
+     <StringVectorProperty
+        name="FileName"
+        command="SetFileName"
+        animateable="0"
+        number_of_elements="1">
+        <FileListDomain name="files"/>
+     </StringVectorProperty>
+
+   <!-- End  Reader -->
+   </SourceProxy>
+
+  </ProxyGroup>
+</ServerManagerConfiguration>
+

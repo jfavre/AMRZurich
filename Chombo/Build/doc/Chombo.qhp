@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QtHelpProject version="1.0">
+    <namespace>Chombo.org</namespace>
+    <virtualFolder>Chombo</virtualFolder>
+    <filterSection>
+        <toc> <section title="Chombo" ref="sources.ChomboReader.html" >
+     <section title="ChomboReader" ref="sources.ChomboReader.html" />
+    <section title="Readers Index" ref="Readers.html" />
+ </section> </toc>
+        <keywords>
+          <!-- how to handle keywords? -->
+        </keywords>
+        <files>
+          <file>*.html</file>
+<file>*.css</file>
+<file>*.png</file>
+<file>*.jpg</file>
+
+        </files>
+    </filterSection>
+</QtHelpProject>

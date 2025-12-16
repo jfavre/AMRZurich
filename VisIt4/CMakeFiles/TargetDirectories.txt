@@ -1,0 +1,4 @@
+/home/jfavre/Projects/AMRZurich/VisIt4/CMakeFiles/EAMAZEDatabase_par.dir
+/home/jfavre/Projects/AMRZurich/VisIt4/CMakeFiles/EAMAZEDatabase_ser.dir
+/home/jfavre/Projects/AMRZurich/VisIt4/CMakeFiles/IAMAZEDatabase.dir
+/home/jfavre/Projects/AMRZurich/VisIt4/CMakeFiles/MAMAZEDatabase.dir

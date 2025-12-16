@@ -1,0 +1,5 @@
+-I"/local/apps/ParaView/dev/include/paraview-5.0"
+-I"/usr/include/python2.7"
+-I"/usr/lib/openmpi/include"
+-I"/usr/lib/openmpi/include/openmpi"
+

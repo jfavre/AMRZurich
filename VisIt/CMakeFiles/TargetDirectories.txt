@@ -1,0 +1,6 @@
+/home/jfavre/Projects/AMRZurich/VisIt/CMakeFiles/IAMAZEDatabase.dir
+/home/jfavre/Projects/AMRZurich/VisIt/CMakeFiles/MAMAZEDatabase.dir
+/home/jfavre/Projects/AMRZurich/VisIt/CMakeFiles/EAMAZEDatabase_ser.dir
+/home/jfavre/Projects/AMRZurich/VisIt/CMakeFiles/EAMAZEDatabase_par.dir
+/home/jfavre/Projects/AMRZurich/VisIt/CMakeFiles/edit_cache.dir
+/home/jfavre/Projects/AMRZurich/VisIt/CMakeFiles/rebuild_cache.dir

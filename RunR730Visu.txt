@@ -1,0 +1,4 @@
+ssh -qt -R 1100:localhost:1100  ssh.psmn.ens-lyon.fr ssh -qt -R 1100:localhost:1100 allo-psmn.psmn.ens-lyon.fr ssh -R 1100:localhost:1100 r730visu
+
+/home/jfavre/apps/ParaView/5.4/bin/pvserver  -rc -ch=localhost -sp=1100
+

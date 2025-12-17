@@ -561,11 +561,7 @@ void vtkAMAZEReader::ReadMetaData()
 
   for (i = 0; i < this->NumberOfGrids; i++)
     {
-#ifdef VTK5
-    this->Grids[i].amrbox = vtkAMRBox(this->Dimensionality, grid[i].box_corners, grid[i].box_corners+3);
-#else
     this->Grids[i].amrbox = vtkAMRBox(grid[i].box_corners, grid[i].box_corners+3);
-#endif
     if(this->Grids[i].level != current_level)
       { // first grid of a given level
       current_level = this->Grids[i].level;
@@ -2127,7 +2123,8 @@ for(int i=0; i < this->Stars.size(); i++)
                                    newstars[i].Position[0], newstars[i].Position[1], newstars[i].Position[2],
                                    newstars[i].Velocity[0], newstars[i].Velocity[1], newstars[i].Velocity[2]
                                    ) << std::endl;
-      /*cerr << "star " << i << endl
+/*
+      cerr << "star " << i << endl
            << "  StarTime "             << newstars[i].StarTime  << endl
            << "  CompRadiusFrac "       << newstars[i].CompRadiusFrac  << endl
            << "  Mass "                 << newstars[i].Mass  << endl
@@ -2228,8 +2225,8 @@ for(int i=0; i < this->Stars.size(); i++)
             ss->GetCenter(c);
             }
           ss->SetRadius(Radius * newstars[i].CompRadiusFrac * 6.96e10 /this->LengthScaleFactor );
-          //std::cerr << std::format("{:14s} at Position ({:e}, {:e}, {:e}), Radius = {:e}\n",
-                                   //newstars[i].InteractionModel, c[0], c[1], c[2], Radius);
+          std::cerr << std::format("{:14s} at Position ({:e}, {:e}, {:e}), Radius = {:e}\n",
+                                   newstars[i].InteractionModel, c[0], c[1], c[2], Radius);
           }
         ss->Update();
         for(vtkIdType k=0; k < THETARES*(PHIRES-2)+2; k++)
@@ -2337,11 +2334,7 @@ for(int i=0; i < this->Stars.size(); i++)
             tf->RotateX(90.0);
             vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
             tfpd->SetTransform(tf);
-#ifdef VTK5
-            tfpd->SetInput(AxiSymStar);
-#else
             tfpd->SetInputData(AxiSymStar);
-#endif
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
@@ -2355,11 +2348,7 @@ for(int i=0; i < this->Stars.size(); i++)
             tf->RotateY(90.0);
             vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
             tfpd->SetTransform(tf);
-#ifdef VTK5
-            tfpd->SetInput(AxiSymStar);
-#else
             tfpd->SetInputData(AxiSymStar);
-#endif
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();

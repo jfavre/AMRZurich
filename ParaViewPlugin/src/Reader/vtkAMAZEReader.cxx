@@ -1,4 +1,4 @@
-#define H5_USE_16_API
+//#define H5_USE_16_API
 #include "vtkAMAZEReader.h"
 
 #include "vtkAMRBox.h"
@@ -125,7 +125,7 @@ static hid_t Create_NewStar_Compound()
                 H5Tset_strpad(labelstring, H5T_STR_NULLTERM);
 
   dim[0] = 3;
-  array1_id = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim, NULL);
+  array1_id = H5Tarray_create2(H5T_NATIVE_DOUBLE, 1, dim);
 
   id = H5Tcreate(H5T_COMPOUND, sizeof(newstar));
   H5Tinsert(id, "StarTime [y]",          HOFFSET(newstar, StarTime), H5T_NATIVE_DOUBLE);
@@ -169,7 +169,7 @@ static hid_t Create_Star_Compound()
                 H5Tset_strpad(labelstring, H5T_STR_NULLTERM);
 
   dim[0] = 3;
-  array1_id = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim, NULL);
+  array1_id = H5Tarray_create2(H5T_NATIVE_DOUBLE, 1, dim);
 
   id = H5Tcreate(H5T_COMPOUND, sizeof(star));
 
@@ -193,7 +193,7 @@ static hid_t Create_AxiSymStar_Compound()
 {
   hsize_t  dim[1];
   dim[0] = 3;
-  hsize_t array1_id = H5Tarray_create(H5T_NATIVE_FLOAT, 1, dim, NULL);
+  hsize_t array1_id = H5Tarray_create2(H5T_NATIVE_FLOAT, 1, dim);
 
   hid_t   id = H5Tcreate(H5T_COMPOUND, sizeof(AxiSymStarCurrent));
 
@@ -212,7 +212,7 @@ static hid_t Create_SpherSymStar_Compound()
 {
   hsize_t  dim[1];
   dim[0] = 3;
-  hsize_t array1_id = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim, NULL);
+  hsize_t array1_id = H5Tarray_create2(H5T_NATIVE_DOUBLE, 1, dim);
 
   hid_t   id = H5Tcreate(H5T_COMPOUND, sizeof(SpherSymStarCurrent));
 
@@ -608,8 +608,8 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
       this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       }
     //cout << "reading the shifted grid info\n";
-    root_id = H5Gopen(this->file_id, "/");
-    dataset = H5Dopen(root_id, "Shifted Grid Info");
+    root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
+    dataset = H5Dopen(root_id, "Shifted Grid Info", H5P_DEFAULT);
     if(dataset < 0)
       {
       cerr << "failed to find shifted grid info. Returning without action\n";
@@ -625,8 +625,8 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
     }
   else
     {
-    root_id = H5Gopen(this->file_id, "/");
-    dataset = H5Dopen(root_id, "Grid Info");
+    root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
+    dataset = H5Dopen(root_id, "Grid Info", H5P_DEFAULT);
     }
   adG_grid_id = H5Tcreate (H5T_COMPOUND, sizeof(adG_grid));
 
@@ -634,13 +634,13 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
   H5Tinsert(adG_grid_id, "level", HOFFSET(adG_grid, level), H5T_NATIVE_INT);
 
   dim[0] = adG_MAXDIM;
-  array0_id = H5Tarray_create(H5T_NATIVE_INT, 1, dim, NULL);
+  array0_id = H5Tarray_create2(H5T_NATIVE_INT, 1, dim);
 
   dim[0] = 2 * adG_MAXDIM;
-  array1_id = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, dim, NULL);
+  array1_id = H5Tarray_create2(H5T_NATIVE_DOUBLE, 1, dim);
 
   dim[0] = 2 * adG_MAXDIM;
-  array2_id = H5Tarray_create(H5T_NATIVE_INT, 1, dim, NULL);
+  array2_id = H5Tarray_create2(H5T_NATIVE_INT, 1, dim);
 
   H5Tinsert(adG_grid_id, "dimensions", HOFFSET(adG_grid, dimensions),
             array0_id);
@@ -700,9 +700,9 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
     }
   H5Gclose(root_id);
 
-  if(this->MappedGrids && (root_id = H5Gopen(this->file_id, "/Map") )>= 0)
+  if(this->MappedGrids && (root_id = H5Gopen(this->file_id, "/Map", H5P_DEFAULT) )>= 0)
     {
-    dataset = H5Dopen(root_id, "Map Parameter");
+    dataset = H5Dopen(root_id, "Map Parameter", H5P_DEFAULT);
     if(dataset < 0)
       {
       cerr << "error opening Map_Parameter\n";
@@ -787,8 +787,8 @@ void vtkAMAZEReader::ReadHDF5VariablesMetaData()
   hid_t   root_id, dataset, adG_component_id, labelstring, unitstring;
   herr_t  status;
 
-  root_id = H5Gopen(this->file_id, "/");
-  dataset = H5Dopen(root_id, "Variable Info");
+  root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
+  dataset = H5Dopen(root_id, "Variable Info", H5P_DEFAULT);
 
   labelstring = H5Tcopy(H5T_C_S1);
                 H5Tset_size(labelstring, adG_LABELLENGTH);
@@ -858,12 +858,12 @@ void vtkAMAZEReader::ReadHDF5MetaData()
   hid_t   attr1;
   herr_t  status;
 // turn off error reporting
-  H5E_auto_t func;
+  H5E_auto2_t func;
   void *client_data;
-  H5Eget_auto(&func, &client_data);
-  H5Eset_auto(NULL, NULL);
+  H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
+  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
 
-  root_id = H5Gopen(this->file_id, "/");
+  root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
 
   attr1 = H5Aopen_name(root_id, "NumberLevels");
   status = H5Aread(attr1, H5T_NATIVE_INT, &this->NumberOfLevels);
@@ -921,7 +921,7 @@ void vtkAMAZEReader::ReadHDF5MetaData()
 
   if(H5Lexists(root_id, "/Map", H5P_DEFAULT))
     {
-    hid_t map_id = H5Gopen(root_id, "/Map");
+    hid_t map_id = H5Gopen(root_id, "/Map", H5P_DEFAULT);
     attr1 = H5Aopen_name(map_id, "Map Type");
     hid_t t1 = H5Aget_type(attr1);
     char map_type[30];
@@ -942,7 +942,7 @@ void vtkAMAZEReader::ReadHDF5MetaData()
     }
   
   H5Gclose(root_id);
-  H5Eset_auto(func, client_data);
+  H5Eset_auto2(H5E_DEFAULT, func, client_data);
 }
 
 vtkDoubleArray* vtkAMAZEReader::ReadVisItVar(int domain, const char *varname)
@@ -979,11 +979,11 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
 
   //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str());
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
   if(level_root_id < 0)
     cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
 
-  grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.grid_nr).c_str());
+  grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.grid_nr).c_str(), H5P_DEFAULT);
   if(grid_root_id < 0)
     cerr << __LINE__<< ": ReadVar(): bad grid_root_id returned\n";
 
@@ -1023,7 +1023,7 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
   //cerr << "reading PointDataArray " << variable.label<<endl;
   void *dataArray = scalars->GetVoidPointer(0);
 
-  dataset_id = H5Dopen(grid_root_id, (const char *) variable.label);
+  dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
   if(dataset_id < 0)
      {
      cerr << "error opening HDF5 dataset for var " << variable.label << endl;
@@ -1081,7 +1081,7 @@ void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variabl
        << endl;*/
   adG_grid grid = this->Grids[domain];
 
-  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str());
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
   if(level_root_id < 0)
     cerr << "bad level_root_id returned\n";
   else
@@ -1089,7 +1089,7 @@ void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variabl
     std::string lname = std::format("Grid {}", grid.grid_nr);
     if(H5Lexists(level_root_id, lname.c_str(), H5P_DEFAULT))
       {
-      grid_root_id = H5Gopen(level_root_id, lname.c_str());
+      grid_root_id = H5Gopen(level_root_id, lname.c_str(), H5P_DEFAULT);
       if(grid_root_id < 0)
         cerr << "ReadVar(): bad grid_root_id returned\n";
 
@@ -1100,7 +1100,7 @@ void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variabl
                     grid.dimensions[1]<< "x"<<
                     grid.dimensions[2]<< endl;
 */
-      dataset_id = H5Dopen(grid_root_id, (const char *) variable.label);
+      dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
       if(dataset_id < 0)
         {
         cerr << "error opening HDF5 dataset for var " << variable.label << endl;
@@ -1912,25 +1912,25 @@ int vtkAMAZEReader::BuildStars()
   this->Stars.clear();
 
 // turn off error reporting just in case there are no stars
-  H5E_auto_t func;
+  H5E_auto2_t func;
   void *client_data;
-  H5Eget_auto(&func, &client_data);
-  H5Eset_auto(NULL, NULL);
+  H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
+  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
   //cerr << "1273: H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-  apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems");
+  apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems", H5P_DEFAULT);
 
   if(apr_root_id < 0)
     {
     return 0;
     }
-  interactions_root_id = H5Gopen(apr_root_id, "Interactions");
+  interactions_root_id = H5Gopen(apr_root_id, "Interactions", H5P_DEFAULT);
   if(interactions_root_id >=0)
     {
     attr1 = Create_Interaction_Compound();
     interactions = new interaction[2];
 
-    dataset1 = H5Dopen(interactions_root_id, "IsotrInfWind");
+    dataset1 = H5Dopen(interactions_root_id, "IsotrInfWind", H5P_DEFAULT);
     if(dataset1 >=0 )
       {
       status = H5Dread(dataset1, attr1, H5S_ALL, H5S_ALL, H5P_DEFAULT, &interactions[0]);
@@ -1939,7 +1939,7 @@ int vtkAMAZEReader::BuildStars()
       {
       cerr << "error reading Interactions::IsotrInfWind\n";
       }
-    dataset2 = H5Dopen(interactions_root_id, "Simple Accretors");
+    dataset2 = H5Dopen(interactions_root_id, "Simple Accretors", H5P_DEFAULT);
     if(dataset2 >=0 )
       {
       status = H5Dread(dataset2, attr1, H5S_ALL, H5S_ALL, H5P_DEFAULT, &interactions[1]);
@@ -1953,12 +1953,12 @@ int vtkAMAZEReader::BuildStars()
     H5Gclose(interactions_root_id);
     }
 
-  models_root_id = H5Gopen(apr_root_id, "Stars");
+  models_root_id = H5Gopen(apr_root_id, "Stars", H5P_DEFAULT);
 
   hid_t dataspace;
   int ModelsArraySize;
   hsize_t dims_out[1]; // we assume rank = 1
-  dataset1 = H5Dopen(models_root_id, "Stars: Models&Interaction");
+  dataset1 = H5Dopen(models_root_id, "Stars: Models&Interaction", H5P_DEFAULT);
   if(dataset1 >=0)
     {
     dataspace = H5Dget_space(dataset1);
@@ -1976,7 +1976,7 @@ int vtkAMAZEReader::BuildStars()
 
   newstar *newstars=NULL;
   star *stars=NULL;
-  dataset2 = H5Dopen(models_root_id, "Stars: Present State");
+  dataset2 = H5Dopen(models_root_id, "Stars: Present State", H5P_DEFAULT);
   if(dataset2 >=0) // old-style stars before november 6, 2008
     {
     cerr << "vtkAMAZEReader::BuildStars(Old-style STARS)\n";
@@ -2086,7 +2086,7 @@ for(int i=0; i < this->Stars.size(); i++)
 */
     } // end of old-style stars before november 6, 2008
 
-  else if((StarsDS = H5Dopen(models_root_id, "Stars")) >= 0)
+  else if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
     {
     cerr << "\n\n";
     dataspace = H5Dget_space(StarsDS);
@@ -2145,10 +2145,10 @@ for(int i=0; i < this->Stars.size(); i++)
         hid_t attr1, dataspace, starN_G, starN_DS;
         hsize_t dims_out[1]; // we assume rank = 1
 
-        starN_G = H5Gopen(models_root_id, starname.c_str());
+        starN_G = H5Gopen(models_root_id, starname.c_str(), H5P_DEFAULT);
         if(starN_G >=0)
           {
-          starN_DS = H5Dopen(starN_G, "SpherSymStar_Current");
+          starN_DS = H5Dopen(starN_G, "SpherSymStar_Current", H5P_DEFAULT);
           if(starN_DS >=0)
             {
             status = H5Dread(starN_DS, SpherSymStarCurrent_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, spherStarData);
@@ -2263,7 +2263,7 @@ for(int i=0; i < this->Stars.size(); i++)
           hid_t attr1, dataspace, starN_G, starN_DS;
           hsize_t dims_out[1]; // we assume rank = 1
           //std::cerr << "opening " << starname <<"\n";
-          starN_G = H5Gopen(models_root_id, starname.c_str());
+          starN_G = H5Gopen(models_root_id, starname.c_str(), H5P_DEFAULT);
           AxiSymStarCurrent *axiStarData=NULL;
           int AngleResolution, AxisDirection=0;
           if(starN_G >=0)
@@ -2276,7 +2276,7 @@ for(int i=0; i < this->Stars.size(); i++)
               H5Aread(attr1, H5T_NATIVE_INT, &AxisDirection);
             H5Aclose(attr1);
 
-            starN_DS = H5Dopen(starN_G, "AxiSymStar_Current");
+            starN_DS = H5Dopen(starN_G, "AxiSymStar_Current", H5P_DEFAULT);
             dataspace = H5Dget_space(starN_DS);
             status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
             if(AngleResolution != dims_out[0])
@@ -2359,8 +2359,8 @@ for(int i=0; i < this->Stars.size(); i++)
   H5Gclose(apr_root_id);
   H5Fclose(this->file_id);
   this->file_id = 0;
-  //cerr << "1658: H5Fclose( " << this->FileName << ")\n";
-  H5Eset_auto(func, client_data);
+
+  H5Eset_auto2(H5E_DEFAULT, func, client_data);
   //cerr << "exitBuildStars() with " << this->NumberOfSphericallySymmetricStars << " spheric-symmetric stars, and " << this->NumberOfAxisSymmetricStars << " axis-symmetric stars\n";
 
   return nb_stars;

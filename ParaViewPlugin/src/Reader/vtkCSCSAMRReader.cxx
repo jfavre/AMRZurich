@@ -84,7 +84,7 @@ int vtkCSCSAMRReader::CanReadFile(const char* fname )
     return 0;
   cerr << "vtkCSCSAMRReader::CanReadFile\n";
   hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
-  hid_t root_id = H5Gopen(f_id, "/");
+  hid_t root_id = H5Gopen(f_id, "/", H5P_DEFAULT);
   if(H5Lexists(root_id, "/Grid Info", H5P_DEFAULT))
     {
       H5Gclose(root_id);
@@ -485,10 +485,10 @@ int vtkCSCSAMRReader::LoadStars(hid_t root_id,
 
   int  i, j, nb_stars, nb_SpherSymStars=0, nb_AxiSymStars=0;
   herr_t error;
-  H5E_auto_t func;
+  H5E_auto2_t func;
   void *client_data;
-  H5Eget_auto(&func, &client_data);
-  H5Eset_auto(NULL, NULL);
+  H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
+  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
 
   this->myreader->BuildStars();
 
@@ -500,7 +500,7 @@ int vtkCSCSAMRReader::LoadStars(hid_t root_id,
     }
 
   //H5Gclose(apr_root_id);
-  H5Eset_auto(func, client_data);
+  H5Eset_auto2(H5E_DEFAULT, func, client_data);
   return nb_stars;
 }
 

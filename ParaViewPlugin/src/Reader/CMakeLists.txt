@@ -7,7 +7,7 @@ set(sources
 set(private_headers
   vtkCSCSAMRReader.h)
 
-ADD_DEFINITIONS(-DH5_USE_16_API)
+#ADD_DEFINITIONS(-DH5_USE_16_API)
 
 set_source_files_properties(
   vtkAMAZEReader

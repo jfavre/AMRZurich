@@ -657,24 +657,19 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
 
   for (int levelId=0; levelId < this->NumberOfLevels; levelId++)
     {
-    char name[16];
-    sprintf(name, "Level %d", levelId);
+    std::string name = std::format("Level {}", levelId);
 
-    //level_root_id = H5Gopen(root_id, name); //levelName.str());
-    //if(level_root_id < 0)
-      //cerr << "bad level_root_id returned\n";
-
-    attr1 = H5Aopen_by_name(root_id, name, "Refinement Ratio", H5P_DEFAULT, H5P_DEFAULT);
+    attr1 = H5Aopen_by_name(root_id, name.c_str(), "Refinement Ratio", H5P_DEFAULT, H5P_DEFAULT);
     status = H5Aread(attr1, H5T_NATIVE_INT, &this->Levels[levelId].RefRatio);
     status = H5Aclose(attr1);
 
-    attr1 = H5Aopen_by_name(root_id, name, "Cell Edge Length", H5P_DEFAULT, H5P_DEFAULT);
+    attr1 = H5Aopen_by_name(root_id, name.c_str(), "Cell Edge Length", H5P_DEFAULT, H5P_DEFAULT);
     status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Levels[levelId].DXs[0]);
     status = H5Aclose(attr1);
 
-    if(H5Aexists_by_name(root_id, name, "Cell Edge Length Y", H5P_DEFAULT) > 0)
+    if(H5Aexists_by_name(root_id, name.c_str(), "Cell Edge Length Y", H5P_DEFAULT) > 0)
       {
-      attr1 = H5Aopen_by_name(root_id, name, "Cell Edge Length Y", H5P_DEFAULT, H5P_DEFAULT);
+      attr1 = H5Aopen_by_name(root_id, name.c_str(), "Cell Edge Length Y", H5P_DEFAULT, H5P_DEFAULT);
       if(attr1 >= 0)
         {
         status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Levels[levelId].DXs[1]);
@@ -686,9 +681,9 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
     else
       this->Levels[levelId].DXs[1] = this->Levels[levelId].DXs[0];
 
-    if(H5Aexists_by_name(root_id, name, "Cell Edge Length Z", H5P_DEFAULT) > 0)
+    if(H5Aexists_by_name(root_id, name.c_str(), "Cell Edge Length Z", H5P_DEFAULT) > 0)
       {
-      attr1 = H5Aopen_by_name(root_id, name, "Cell Edge Length Z", H5P_DEFAULT, H5P_DEFAULT);
+      attr1 = H5Aopen_by_name(root_id, name.c_str(), "Cell Edge Length Z", H5P_DEFAULT, H5P_DEFAULT);
       if(attr1 >= 0)
         {
         status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Levels[levelId].DXs[2]);
@@ -974,7 +969,6 @@ vtkDoubleArray* vtkAMAZEReader::ReadVisItVar(int domain, const char *varname)
 vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &variable)
 {
   hid_t level_root_id, grid_root_id, dataset_id, status, mem_space_id;
-  char lname[16];
   int domain = this->FindDomainId(levelId, block);
   /*cerr << "domain = " << domain 
        << ", level = " << levelId 
@@ -983,15 +977,13 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
        << endl;*/
   adG_grid grid = this->Grids[domain];
 
-  sprintf(lname, "/Level %d", levelId);
   //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-  level_root_id = H5Gopen(this->file_id, lname);
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str());
   if(level_root_id < 0)
     cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
 
-  sprintf(lname, "Grid %d", grid.grid_nr);  //lname is reused here
-  grid_root_id = H5Gopen(level_root_id, lname);
+  grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.grid_nr).c_str());
   if(grid_root_id < 0)
     cerr << __LINE__<< ": ReadVar(): bad grid_root_id returned\n";
 
@@ -1081,7 +1073,6 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
 void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variable)
 {
   hid_t level_root_id, grid_root_id, dataset_id, status, mem_space_id;
-  char lname[16];
   int domain = this->FindDomainId(levelId, block);
   /*cerr << "domain = " << domain 
        << ", level = " << levelId 
@@ -1090,16 +1081,15 @@ void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variabl
        << endl;*/
   adG_grid grid = this->Grids[domain];
 
-  sprintf(lname, "/Level %d", levelId);
-  level_root_id = H5Gopen(this->file_id, lname);
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str());
   if(level_root_id < 0)
-    cerr << "543 bad level_root_id returned\n";
+    cerr << "bad level_root_id returned\n";
   else
     {
-    sprintf(lname, "Grid %d", grid.grid_nr);  //lname is reused here
-    if(H5Lexists(level_root_id, lname, H5P_DEFAULT))
+    std::string lname = std::format("Grid {}", grid.grid_nr);
+    if(H5Lexists(level_root_id, lname.c_str(), H5P_DEFAULT))
       {
-      grid_root_id = H5Gopen(level_root_id, lname);
+      grid_root_id = H5Gopen(level_root_id, lname.c_str());
       if(grid_root_id < 0)
         cerr << "ReadVar(): bad grid_root_id returned\n";
 
@@ -1157,9 +1147,8 @@ vtkUniformGrid* vtkAMAZEReader::ReadUniformGrid(int levelId, int block)
   sarr->SetName("GridName");
   sarr->SetNumberOfComponents(1);
   sarr->SetNumberOfTuples(1);
-  char name[16];
-  sprintf(name, "Grid %d", grid.grid_nr);
-  sarr->SetValue(0, name);
+
+  sarr->SetValue(0, std::format("Grid {}", grid.grid_nr));
   vtkUniformGrid* ug = vtkUniformGrid::New();
   ug->Initialize();
   ug->GetFieldData()->AddArray(sarr);
@@ -2088,14 +2077,13 @@ int vtkAMAZEReader::BuildStars()
 for(int i=0; i < this->Stars.size(); i++)
   {
   vtkDataSetWriter *writer = vtkDataSetWriter::New();
-  writer->SetInput(this->Stars[i]);
-  char f[65];
-  sprintf(f,"/tmp/tmp/foo.%02d.vtk", i);
+  writer->SetInputData(this->Stars[i]);
   cerr << "writing " << this->Stars[i]->GetNumberOfPoints() << " to disk\n";
-  writer->SetFileName((const char*)f);
+  writer->SetFileName(std::format("/tmp/foo.{:2d}.vtk", i).c_str());
   writer->Write();
   writer->Delete();
-  }*/
+  }
+*/
     } // end of old-style stars before november 6, 2008
 
   else if((StarsDS = H5Dopen(models_root_id, "Stars")) >= 0)
@@ -2153,12 +2141,11 @@ for(int i=0; i < this->Stars.size(); i++)
       for (i=0; i < nb_stars; i++)
         {
         double Radius;
-        char starname[16];
-        sprintf(starname, "Star %d", i+1);
+        std::string starname = std::format("Star {}", i+1);
         hid_t attr1, dataspace, starN_G, starN_DS;
         hsize_t dims_out[1]; // we assume rank = 1
 
-        starN_G = H5Gopen(models_root_id, starname);
+        starN_G = H5Gopen(models_root_id, starname.c_str());
         if(starN_G >=0)
           {
           starN_DS = H5Dopen(starN_G, "SpherSymStar_Current");
@@ -2271,13 +2258,12 @@ for(int i=0; i < this->Stars.size(); i++)
         {
         if(strstr(newstars[I].StarModel, "AxiSymStar"))
           {
-          char starname[16];
-          sprintf(starname, "Star %d", J+1);
+          std::string starname = std::format("Star {}", J+1);
 
           hid_t attr1, dataspace, starN_G, starN_DS;
           hsize_t dims_out[1]; // we assume rank = 1
-          //cerr << "opening " << starname<<"\n";
-          starN_G = H5Gopen(models_root_id, starname);
+          //std::cerr << "opening " << starname <<"\n";
+          starN_G = H5Gopen(models_root_id, starname.c_str());
           AxiSymStarCurrent *axiStarData=NULL;
           int AngleResolution, AxisDirection=0;
           if(starN_G >=0)
@@ -2297,7 +2283,7 @@ for(int i=0; i < this->Stars.size(); i++)
               cerr << "sanity check: NTheta resolution is mis-read?\n";
 
             AngleResolution = dims_out[0];
-            //cout << "Found phi array of size " << AngleResolution << " for " << starname << endl;
+            //std::cout << "Found phi array of size " << AngleResolution << " for " << starname << endl;
             H5Sclose(dataspace);
 
             axiStarData = new AxiSymStarCurrent[AngleResolution];

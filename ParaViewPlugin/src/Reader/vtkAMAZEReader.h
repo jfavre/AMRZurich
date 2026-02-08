@@ -127,7 +127,10 @@ public:
   void PrintSelf(ostream& os, vtkIndent indent);
   static vtkAMAZEReader* New();
 
-  void SetFileName( const char * fileName );
+  //void SetFileName( const char * fileName );
+  virtual void SetFileName(VTK_FILEPATH const char* filename);
+  vtkGetFilePathMacro(FileName);
+  
   vtkSetStringMacro(HDF5SaveFileName);
   vtkGetStringMacro(HDF5SaveFileName);
 
@@ -224,7 +227,8 @@ protected:
   ~vtkAMAZEReader();
   // The input file's name.
   hid_t file_id;
-  std::string FileName;
+  //std::string FileName;
+  char* FileName = nullptr;
   char* HDF5SaveFileName;
   int LogData; // will automatically calculate log10() for Density, Temperature and Pressure
   int Dimensionality;

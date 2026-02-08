@@ -14,7 +14,6 @@ class vtkAMRBox;
 class vtkUniformGrid;
 class vtkDoubleArray;
 
-//#include "vtkCompositeDataSetAlgorithm.h"
 #include "vtkOverlappingAMRAlgorithm.h"
 #include "AMAZEReaderModule.h" // for export macro
 #include "vtkAMAZEReader.h"
@@ -123,8 +122,6 @@ protected:
   int MinLevelRead;
   unsigned int MaximumLevelsToReadByDefault;
   vtkAMAZEReader *myreader;
-
-  //FILE *errs;
 
   vtkDataArraySelection* PointDataArraySelection;
 

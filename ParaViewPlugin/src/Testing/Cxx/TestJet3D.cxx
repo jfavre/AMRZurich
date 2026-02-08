@@ -39,7 +39,7 @@ using namespace std;
 #define VTK_CREATE(type, var) \
   vtkSmartPointer<type> var = vtkSmartPointer<type>::New();
 
-#define ALL 1
+//#define ALL 1
 
 int main(int argc, char **argv)
 {

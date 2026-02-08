@@ -24,7 +24,7 @@
 
 #include "vtkTimerLog.h"
 #include "vtkAMRUtilities.h"
-#define PARALLEL_DEBUG 1
+//#define PARALLEL_DEBUG 1
 
 #include <vector>
 #include <string>
@@ -82,7 +82,7 @@ int vtkCSCSAMRReader::CanReadFile(const char* fname )
 {
   if (! fname )
     return 0;
-  cerr << "vtkCSCSAMRReader::CanReadFile\n";
+  cout << "vtkCSCSAMRReader::CanReadFile\n";
   hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
   hid_t root_id = H5Gopen(f_id, "/", H5P_DEFAULT);
   if(H5Lexists(root_id, "/Grid Info", H5P_DEFAULT))
@@ -110,8 +110,8 @@ int vtkCSCSAMRReader::RequestInformation(
     return 0;
     }
 
-  //cerr << "Begin RequestInformation\n";
-//cerr << "AMR:Information\n";
+  cerr << "Begin RequestInformation\n";
+
   vtkInformation* info = outputVector->GetInformationObject(0);
   //info->Set(vtkStreamingDemandDrivenPipeline::MAXIMUM_NUMBER_OF_PIECES(), -1);
 
@@ -120,7 +120,7 @@ int vtkCSCSAMRReader::RequestInformation(
 
   vtkOverlappingAMR *output = static_cast<vtkOverlappingAMR *>(
     info->Get(vtkDataObject::DATA_OBJECT()));
-
+  cout << __LINE__ << " : Got a vtkOverlappingAMR* = " << output << std::endl;
   //FILE *fp=NULL;
   int levelId, GridId, i, node_veclen;
   double time, time_scalor;
@@ -137,7 +137,7 @@ int vtkCSCSAMRReader::RequestInformation(
     this->myreader->LengthScaleOff();
 
   this->myreader->ScaleChoice = (ScaleOption)this->ScaleChoice;
-
+cerr << __LINE__ << "vtkCSCSAMRReader::RequestInformation() Fname = " << this->FileName << "\n";
   this->myreader->SetFileName(this->FileName);
 
   this->myreader->ReadMetaData();
@@ -186,7 +186,7 @@ int vtkCSCSAMRReader::RequestInformation(
     {
     this->myreader->GetSpacing(levelId, spacing);
     output->SetSpacing(levelId, spacing);
-cerr << "output->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
+    //cout << __LINE__ << ": output->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
     // old output->SetNumberOfDataSets(levelId, this->GridsPerLevels[levelId]);
     if ( levelId >= this->myreader->MinLevelRead && levelId <= this->myreader->MaxLevelRead )
       {
@@ -258,7 +258,7 @@ int vtkCSCSAMRReader::RequestData(
   bool has_block_requests =
     info->Has(vtkCompositeDataPipeline::LOAD_REQUESTED_BLOCKS()) != 0;
   vtkOverlappingAMR* output = vtkOverlappingAMR::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
-  cerr << "has_block_requests = " << has_block_requests << endl;
+  //cout << __LINE__ << ": has_block_requests = " << has_block_requests << endl;
   if(has_block_requests)
   {
     //this->Internal->UpdateIndices = std::set<int>();

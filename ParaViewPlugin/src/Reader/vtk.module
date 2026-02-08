@@ -3,6 +3,7 @@ NAME
 LIBRARY_NAME
   AMAZEReader
 DEPENDS
+  ParaView::VTKExtensionsIOCore
   VTK::CommonCore
   VTK::CommonExecutionModel
   VTK::CommonDataModel

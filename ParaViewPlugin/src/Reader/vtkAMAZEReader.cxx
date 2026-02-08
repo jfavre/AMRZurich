@@ -476,6 +476,8 @@ vtkAMAZEReader::~vtkAMAZEReader()
 {
   int i;
   //cerr << "AMAZEDestructor\n";
+  this->SetFileName(nullptr);
+    
   for(i=0; i < this->Stars.size(); i++)
     {
     //(this->Stars[i])->Delete();
@@ -493,19 +495,20 @@ vtkAMAZEReader::~vtkAMAZEReader()
     this->file_id = 0;
     //cerr << "465: H5Fclose( " << this->FileName << ")\n";
     }
-/*
-  if(this->FileName != NULL)
-    {
-    free(this->FileName);
-    this->FileName = 0;
-    }
-*/
 }
 
+/*
 void vtkAMAZEReader::SetFileName( const char * fileName )
 {
   this->FileName = fileName;
 }
+*/
+void vtkAMAZEReader::SetFileName(const char* filename)
+{
+  vtkSetStringBodyMacro(FileName, filename);
+  //this->Reset();
+}
+
 
 //----------------------------------------------------------------------------
 void vtkAMAZEReader::ReadMetaData()
@@ -516,21 +519,21 @@ void vtkAMAZEReader::ReadMetaData()
 
   this->Levels.clear();
   this->Labels.clear();
-  if ( this->FileName.empty())
+  if (!this->FileName || *this->FileName == 0)
     {
     //this->SetErrorCode(vtkErrorCode::NoFileNameError);
     //vtkErrorMacro(<< "Must specify adG file");
     return;
     }
-  cerr << "519: H5Fopen( " << this->FileName << ")\n";
-  this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+  cout << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
+  this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   if(this->file_id<0)
     {
     cerr << "file could not be opened. Check filename " << endl;
     return;
     }
   this->ReadHDF5MetaData();
-  cerr << "done with ReadHDF5MetaData() " << endl;
+  //cout << "done with ReadHDF5MetaData() " << endl;
   this->SetTime(this->GetTime() / this->TimeScalor);
 
   //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &this->Time, 1);
@@ -540,11 +543,10 @@ void vtkAMAZEReader::ReadMetaData()
   this->Labels.resize(this->NumberOfComponents);
 
   this->ReadHDF5VariablesMetaData();
-  //cerr << "done with ReadHDF5VariablesMetaData() " << endl;
+
   this->Grids.resize(this->NumberOfGrids);
 
   this->ReadHDF5GridsMetaData(false);
-  //cerr << "done with ReadHDF5GridsMetaData() " << endl;
 
   this->CheckVarSize(0, 0, this->Labels[0]);
 
@@ -552,7 +554,7 @@ void vtkAMAZEReader::ReadMetaData()
     {
     H5Fclose(this->file_id);
     this->file_id = 0;
-    //cerr << "516: H5Fclose( " << this->FileName << ")\n";
+    cout << __LINE__ << ": H5Fclose( " << this->FileName << ")\n";
     }
 
 ///////////////////////////////////////////////////////////////////
@@ -582,7 +584,10 @@ void vtkAMAZEReader::ReadMetaData()
   int firstLevel = this->MinLevelRead;
   int lastLevel = this->MaxLevelRead;
 
-  cerr<< "\tDimensionality: " << this->Dimensionality << "\n\tNumberOfComponents: " << this->NumberOfComponents << "\n\tNumberOfLevels: " << this->NumberOfLevels << "\n\tNumberOfGrids: " << this->NumberOfGrids << endl;
+  cout << __LINE__ << "\tDimensionality: " << this->Dimensionality 
+                 << "\n\tNumberOfComponents: " << this->NumberOfComponents
+                 << "\n\tNumberOfLevels: " << this->NumberOfLevels
+                 << "\n\tNumberOfGrids: " << this->NumberOfGrids << endl;
  grid = this->Grids;
  int size = grid[0].dimensions[0];
 
@@ -600,12 +605,11 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
   hid_t   attr1, array0_id, array1_id, array2_id;
   hsize_t  dim[2];
 
-
   if(shiftedGrid)
     {
     if(!this->file_id)
       {
-      this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+      this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
       }
     //cout << "reading the shifted grid info\n";
     root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
@@ -904,18 +908,18 @@ void vtkAMAZEReader::ReadHDF5MetaData()
     {
     case 0: // pc
       this->LengthScaleFactor  *= 3.08567782e18;
-      cerr << "!!!\nUsing PARSEC with Length Scale Factor * by 3.08567782e18 = " << this->LengthScaleFactor << "!!!\n";
+      cout << "!!!\nUsing PARSEC with Length Scale Factor * by 3.08567782e18 = " << this->LengthScaleFactor << "!!!\n";
     break;
     case 1: // AU
       this->LengthScaleFactor  *= 1.49597870700e13;
-      cerr << "!!!\nUsing AU with Length Scale Factor * by 1.49597870700e13 = " << this->LengthScaleFactor << "!!!\n";
+      cout << "!!!\nUsing AU with Length Scale Factor * by 1.49597870700e13 = " << this->LengthScaleFactor << "!!!\n";
     break;
     case 2: // RSun
       this->LengthScaleFactor  *= 6.96342e10;
-      cerr << "!!!\nUsing RSun with Length Scale Factor * by 6.96342e10 = " << this->LengthScaleFactor << "!!!\n";
+      cout << "!!!\nUsing RSun with Length Scale Factor * by 6.96342e10 = " << this->LengthScaleFactor << "!!!\n";
     break;
     case 3:
-      cerr << "!!!\nLength Scale Factor  is untouched!!!\n";
+      //cout << "!!!\nLength Scale Factor  is untouched!!!\n";
     break;
     }
 
@@ -978,7 +982,7 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
   adG_grid grid = this->Grids[domain];
 
   //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
-  this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+  this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
   if(level_root_id < 0)
     cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
@@ -1189,20 +1193,10 @@ vtkUniformGrid* vtkAMAZEReader::ReadUniformGrid(int levelId, int block)
                   grid.origin[2]/this->LengthScaleFactor);
   else
     ug->SetOrigin(grid.origin[0], grid.origin[1], grid.origin[2]);
-/*
-cerr << "UG (L=" << levelId << ", b=" << block << ", ): at Origin " << grid.origin[0] << ", "<<
-                    grid.origin[1]<< ", "<<
-                    grid.origin[2]<<endl;
-*/
   ug->SetDimensions(grid.dimensions[0],
                     grid.dimensions[1],
                     grid.dimensions[2]);
 
-/*
-cerr << "UG: of size " << grid.dimensions[0] << "x"<<
-                    grid.dimensions[1]<< "x"<<
-                    grid.dimensions[2]<<endl;
-*/
   return ug;
 } // ReadUniformGrid
 
@@ -1917,7 +1911,7 @@ int vtkAMAZEReader::BuildStars()
   H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
   H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
   //cerr << "1273: H5Fopen( " << this->FileName << ")\n";
-  this->file_id = H5Fopen(this->FileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+  this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems", H5P_DEFAULT);
 
   if(apr_root_id < 0)
@@ -2101,7 +2095,8 @@ for(int i=0; i < this->Stars.size(); i++)
 
     for(i=0; i < nb_stars; i++)
       {
-      std::cerr << std::format("{:s}\n"
+      /*
+      std::cout << __LINE__ << ": " << std::format("{:s}\n"
                                //"  StarTime {:e}\n"
                                "  Position {:e}, {:e}, {:e}\n"
                                "  Velocity {:e}, {:e}, {:e}\n"
@@ -2111,6 +2106,7 @@ for(int i=0; i < this->Stars.size(); i++)
                                    newstars[i].Position[0], newstars[i].Position[1], newstars[i].Position[2],
                                    newstars[i].Velocity[0], newstars[i].Velocity[1], newstars[i].Velocity[2]
                                    ) << std::endl;
+     */
 /*
       cerr << "star " << i << endl
            << "  StarTime "             << newstars[i].StarTime  << endl
@@ -2200,9 +2196,6 @@ for(int i=0; i < this->Stars.size(); i++)
                           newstars[i].Position[1]/this->LengthScaleFactor,
                           newstars[i].Position[2]/this->LengthScaleFactor);
             ss->GetCenter(c);
-            //ss->SetCenter(newstars[i].Position[0],
-                          //newstars[i].Position[1],
-                          //newstars[i].Position[2]);
             }
           else
             {
@@ -2212,7 +2205,7 @@ for(int i=0; i < this->Stars.size(); i++)
             ss->GetCenter(c);
             }
           ss->SetRadius(Radius * newstars[i].CompRadiusFrac * 6.96e10 /this->LengthScaleFactor );
-          std::cerr << std::format("{:14s} at Position ({:e}, {:e}, {:e}), Radius = {:e}\n",
+          std::cout << __LINE__ << ": " << std::format("{:14s} at Position ({:e}, {:e}, {:e}), Radius = {:e}\n",
                                    newstars[i].InteractionModel, c[0], c[1], c[2], Radius);
           }
         ss->Update();

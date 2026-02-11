@@ -1,8 +1,5 @@
-// .NAME vtkCSCSAMRReader - Reads CSCSAMR files (in development)
+// .NAME vtkAMAZEFileSeriesReader - Reads series of AMAZE HDF5 files
 // .SECTION Description
-// This is an experimental CSCSAMR file reader. It is mainly used
-// for development and does not support all features of CSCSAMR
-// format. Use at your own risk.
 
 #ifndef vtkAMAZEFileSeriesReader_h
 #define vtkAMAZEFileSeriesReader_h

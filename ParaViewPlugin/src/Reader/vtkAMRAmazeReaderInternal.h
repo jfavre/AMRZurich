@@ -1,9 +1,8 @@
-// .NAME vtkCSCSAMRReader - Reads CSCSAMR files (in development)
+// .NAME vtkAMRAmazeReaderInternal - Reads AMAZE AMR files (in development)
 // .SECTION Description
-// This is an experimental CSCSAMR file reader. 
 
-#ifndef __vtkAMRAmazeReaderInternalInternal_h
-#define __vtkAMRAmazeReaderInternalInternal_h
+#ifndef __vtkAMRAmazeReaderInternal_h
+#define __vtkAMRAmazeReaderInternal_h
 
 class vtkPolyData;
 class vtkUniformGrid;

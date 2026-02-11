@@ -1,7 +1,8 @@
 <ServerManagerConfiguration>
   <!-- ================================================== -->
   <ProxyGroup name="internal_sources">
-    <Proxy class="vtkCSCSAMRReader"
+    <Proxy class="vtkAMRAmazeReader"
+           label="AMAZE AMR Reader"
            name="AMAZEReaderCore">
       <OutputPort index="0"
                   name="AMR"/>
@@ -115,13 +116,14 @@
      </StringVectorProperty>
 
     </Proxy>
+    <!-- end of "internal_sources" -->
   </ProxyGroup>
   <!-- ================================================== -->
 
   <ProxyGroup name="sources">
     <SourceProxy class="vtkAMAZEFileSeriesReader"
                  file_name_method="SetFileName"
-                 label="AMAZEReader"
+                 label="AMAZE Reader"
                  name="AMAZEReader"
                  si_class="vtkSIMetaReaderProxy">
       <Documentation long_help="Reads HDF5 AMAZE files"
@@ -136,14 +138,15 @@
                proxygroup="internal_sources"
                proxyname="AMAZEReaderCore"/>
         <ExposedProperties>
-          <Property name="PointArrayInfo" />
-          <Property name="PointArrayStatus" />
-          <Property name="LevelRange" />
-          <Property name="LevelSet" />
-          <Property name="LogData" />
-          <Property name="ShiftedGrid" />
-          <Property name="LengthScale" />
-          <Property name="BoxLength" />
+          <Property name="PointArrayInfo"/>
+          <Property name="PointArrayStatus"/>
+          <Property name="LevelRange"/>
+          <Property name="LevelSet"/>
+          <Property name="LogData"/>
+          <Property name="ShiftedGrid"/>
+          <Property name="LengthScale"/>
+          <Property name="BoxLength"/>
+
         </ExposedProperties>
       </SubProxy>
 
@@ -155,9 +158,8 @@
       <StringVectorProperty animateable="0"
                             clean_command="RemoveAllFileNames"
                             command="AddFileName"
-                            information_property="FileNameInfo"
                             name="FileNames"
-                            number_of_elements="1"
+                            number_of_elements="0"
                             panel_visibility="never"
                             repeat_command="1">
         <FileListDomain name="files" />
@@ -174,7 +176,7 @@
           Available timestep values.
         </Documentation>
       </DoubleVectorProperty>
-
+      
       <Hints>
         <ReaderFactory extensions="amr5"
                        file_description="HDF5 AMAZE files" />

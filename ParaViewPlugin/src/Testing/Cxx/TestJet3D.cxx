@@ -2,7 +2,7 @@
 #include <vtkAutoInit.h>
 VTK_MODULE_INIT(vtkRenderingOpenGL2);
 VTK_MODULE_INIT(vtkInteractionStyle);
-#include "vtkCSCSAMRReader.h"
+#include "vtkAMRAmazeReader.h"
 #include "vtkOverlappingAMR.h"
 #include "vtkArrayCalculator.h"
 #include "vtkCamera.h"
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   VTK_CREATE(vtkTimerLog, timer);
   timer->StartTimer();
 
-  VTK_CREATE(vtkCSCSAMRReader, reader);
+  VTK_CREATE(vtkAMRAmazeReader, reader);
   reader->SetFileName("/local/data/Walder/jet3d.amr5");
   reader->DebugOff();
   reader->DataScaleOn();

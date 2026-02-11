@@ -1,10 +1,10 @@
 set(classes
-  vtkCSCSAMRReader
-  vtkAMAZEReader
+  vtkAMRAmazeReader
+  vtkAMRAmazeReaderInternal
   vtkAMAZEFileSeriesReader)
 
 set_source_files_properties(
-  vtkAMAZEReader
+  vtkAMRAmazeReaderInternal
   WRAP_EXCLUDE
 )
 
@@ -12,5 +12,5 @@ vtk_module_add_module(AMAZEReader
   CLASSES ${classes}
   )
 paraview_add_server_manager_xmls(
-  XMLS  CSCSAMRReader_Server.xml
+  XMLS AmazeReader_Server.xml
   )

@@ -1,11 +1,9 @@
-// .NAME vtkCSCSAMRReader - Reads CSCSAMR files (in development)
+// .NAME vtkAMRAmazeReader - Reads AMAZE AMR files
 // .SECTION Description
-// This is an experimental CSCSAMR file reader. It is mainly used
-// for development and does not support all features of CSCSAMR
-// format. Use at your own risk.
+// This is an AMAZE AMR file reader.
 
-#ifndef __vtkCSCSAMRReader_h
-#define __vtkCSCSAMRReader_h
+#ifndef __vtkAMRAmazeReader_h
+#define __vtkAMRAmazeReader_h
 
 class vtkDataArraySelection;
 class vtkMultiBlockDataSet;
@@ -21,12 +19,12 @@ class vtkDoubleArray;
 #include <vector> // Needed for vector ivar
 #include <map>
 
-class AMAZEREADER_EXPORT vtkCSCSAMRReader : public vtkOverlappingAMRAlgorithm
+class AMAZEREADER_EXPORT vtkAMRAmazeReader : public vtkOverlappingAMRAlgorithm
 {
 public:
-  vtkTypeMacro(vtkCSCSAMRReader,vtkOverlappingAMRAlgorithm);
+  vtkTypeMacro(vtkAMRAmazeReader,vtkOverlappingAMRAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent);
-  static vtkCSCSAMRReader* New();
+  static vtkAMRAmazeReader* New();
 
   // Description:
   // Get/Set the name of the input file.
@@ -39,8 +37,8 @@ public:
   int GetNumberOfLevels(){return myreader->NumberOfLevels;};
   int GetNumberOfGrids(){return myreader->NumberOfGrids;};
 
-  double GetTime(){return myreader->Time;};
-  void SetTime(double T) {myreader->Time = T;};
+  double GetTime(){return myreader->GetAMAZETime();};
+  void SetTime(double T) {myreader->SetAMAZETime(T);};
 
   vtkSetMacro(MaxLevelWrite, int);
   vtkGetMacro(MaxLevelWrite, int);
@@ -93,8 +91,8 @@ public:
   int CanReadFile(const char* fname);
 
 protected:
-  vtkCSCSAMRReader();
-  ~vtkCSCSAMRReader();
+  vtkAMRAmazeReader();
+  ~vtkAMRAmazeReader();
 
   // New pipeline execution methods.
   virtual int RequestData(vtkInformation*, 
@@ -116,18 +114,18 @@ protected:
   int ScaleChoice;
   int DataScale;
   double LengthScaleFactor;
-  double TimeScalor;
+
   int MaxLevelWrite;
   int MaxLevelRead;
   int MinLevelRead;
   unsigned int MaximumLevelsToReadByDefault;
   vtkAMAZEReader *myreader;
-
+  bool LoadedMetaData;
   vtkDataArraySelection* PointDataArraySelection;
 
  private:
-  vtkCSCSAMRReader(const vtkCSCSAMRReader&) = delete;  // Not implemented.
-  void operator=(const vtkCSCSAMRReader&) = delete;  // Not implemented.
+  vtkAMRAmazeReader(const vtkAMRAmazeReader&) = delete;  // Not implemented.
+  void operator=(const vtkAMRAmazeReader&) = delete;  // Not implemented.
 };
 
 #endif

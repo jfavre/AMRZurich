@@ -1,5 +1,4 @@
-//#define H5_USE_16_API
-#include "vtkAMAZEReader.h"
+#include "vtkAMRAmazeReaderInternal.h"
 
 #include "vtkAMRBox.h"
 #include "vtkByteSwap.h"
@@ -534,7 +533,7 @@ void vtkAMAZEReader::ReadMetaData()
     }
   this->ReadHDF5MetaData();
   //cout << "done with ReadHDF5MetaData() " << endl;
-  this->SetTime(this->GetTime() / this->TimeScalor);
+  this->SetAMAZETime(this->GetAMAZETime() / this->AMAZETimeScalor);
 
   //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &this->Time, 1);
 
@@ -588,8 +587,8 @@ void vtkAMAZEReader::ReadMetaData()
                  << "\n\tNumberOfComponents: " << this->NumberOfComponents
                  << "\n\tNumberOfLevels: " << this->NumberOfLevels
                  << "\n\tNumberOfGrids: " << this->NumberOfGrids << endl;
- grid = this->Grids;
- int size = grid[0].dimensions[0];
+  //grid = this->Grids;
+  //int size = grid[0].dimensions[0];
 
   return;
 }
@@ -886,12 +885,18 @@ void vtkAMAZEReader::ReadHDF5MetaData()
   status = H5Aclose(attr1);
 
   attr1 = H5Aopen_name(root_id, "Time");
-  status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Time);
+  status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->AMAZETime);
+  if (status < 0)
+  {
+    vtkGenericWarningMacro("Failed to open Time Attribute " << endl);
+    return;
+  }
+  else cout << "vtkAMAZEReader::ReadHDF5MetaData read Time = " << this->AMAZETime << endl;
   status = H5Aclose(attr1);
-    //cerr << "AMR::RequestInformation for time " << this->Time << endl;
+    //cerr << "AMR::RequestInformation for time " << this->AMAZETime << endl;
 
   attr1 = H5Aopen_name(root_id, "Time Scaling Factor");
-  status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &TimeScalor);
+  status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &AMAZETimeScalor);
   status = H5Aclose(attr1);
 
   attr1 = H5Aopen_name(root_id, "Length Scale Factor");
@@ -1157,11 +1162,13 @@ vtkUniformGrid* vtkAMAZEReader::ReadUniformGrid(int levelId, int block)
   ug->Initialize();
   ug->GetFieldData()->AddArray(sarr);
   sarr->Delete();
+  /*
   vtkDoubleArray *data = vtkDoubleArray::New();
   data->SetName("Time");
   data->InsertValue(0, this->Time);
   ug->GetFieldData()->AddArray(data);
   data->Delete();
+  */
 /*
   if(this->LengthScale)
     cerr << "LengthScaleFactor = " << this->LengthScaleFactor<<"\n";
@@ -1238,7 +1245,7 @@ vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid(int domain)
   nameArray->Delete();
   vtkDoubleArray *data = vtkDoubleArray::New();
   data->SetName("Time");
-  data->InsertValue(0, this->Time);
+  data->InsertValue(0, this->AMAZETime);
   sg->GetFieldData()->AddArray(data);
   data->Delete();
 
@@ -1482,7 +1489,7 @@ vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid2(int domain)
   nameArray->Delete();
   vtkDoubleArray *data = vtkDoubleArray::New();
   data->SetName("Time");
-  data->InsertValue(0, this->Time);
+  data->InsertValue(0, this->AMAZETime);
   sg->GetFieldData()->AddArray(data);
   data->Delete();
 
@@ -1689,7 +1696,7 @@ vtkRectilinearGrid* vtkAMAZEReader::ReadRectilinearGrid(int domain)
   nameArray->Delete();
   vtkDoubleArray *data = vtkDoubleArray::New();
   data->SetName("Time");
-  data->InsertValue(0, this->Time);
+  data->InsertValue(0, this->AMAZETime);
   rg->GetFieldData()->AddArray(data);
   data->Delete();
 */

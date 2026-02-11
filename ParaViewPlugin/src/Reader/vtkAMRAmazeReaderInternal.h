@@ -2,8 +2,8 @@
 // .SECTION Description
 // This is an experimental CSCSAMR file reader. 
 
-#ifndef __vtkAMAZEReader_h
-#define __vtkAMAZEReader_h
+#ifndef __vtkAMAZEReaderInternal_h
+#define __vtkAMAZEReaderInternal_h
 
 class vtkPolyData;
 class vtkUniformGrid;
@@ -18,11 +18,7 @@ enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres};
 #include <map>
 #include <string>
 
-//#ifdef AMAZE_EXPORTS
-//#include <vtkhdf5/hdf5.h>
-//#else
 #include <vtk_hdf5.h>
-//#endif
 
 #include <stddef.h>
 
@@ -144,8 +140,8 @@ public:
 
   vtkGetMacro(Dimensionality, int);
 
-  vtkSetMacro(Time, double);
-  vtkGetMacro(Time, double);
+  vtkSetMacro(AMAZETime, double);
+  vtkGetMacro(AMAZETime, double);
 
   vtkSetMacro(MaxLevelWrite, int);
   vtkGetMacro(MaxLevelWrite, int);
@@ -206,8 +202,8 @@ public:
   int NumberOfSphericallySymmetricStars;
   int NumberOfAxisSymmetricStars;
   MapName MappedGrids;
-  double TimeScalor;
-  double Time; // simulation time read from HDF5 file
+  double AMAZETimeScalor;
+  double AMAZETime; // simulation time read from HDF5 file
 
   std::vector<adG_component> Labels;
   std::vector<adG_grid>      Grids;

@@ -1,4 +1,4 @@
-#include "vtkCSCSAMRReader.h"
+#include "vtkAMRAmazeReader.h"
 
 #include "vtkByteSwap.h"
 #include "vtkCharArray.h"
@@ -24,7 +24,7 @@
 
 #include "vtkTimerLog.h"
 #include "vtkAMRUtilities.h"
-//#define PARALLEL_DEBUG 1
+#define PARALLEL_DEBUG 1
 
 #include <vector>
 #include <string>
@@ -34,15 +34,15 @@
 
 using namespace std;
 
-vtkStandardNewMacro(vtkCSCSAMRReader);
+vtkStandardNewMacro(vtkAMRAmazeReader);
 
 //
 // http://www.paraview.org/ParaView/index.php/Multi-Resolution_Rendering_with_Overlapping_AMR
 //
-vtkCSCSAMRReader::vtkCSCSAMRReader()
+vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
   this->FileName = nullptr;
-
+  this->LoadedMetaData = false;
   this->LogDataOn();
   this->DataScaleOn();
   this->ShiftedGridOff();
@@ -67,22 +67,23 @@ vtkCSCSAMRReader::vtkCSCSAMRReader()
   this->myreader = vtkAMAZEReader::New();
 }
 
-vtkCSCSAMRReader::~vtkCSCSAMRReader()
+vtkAMRAmazeReader::~vtkAMRAmazeReader()
 {
   if(this->FileName != NULL)
     {
     delete [] this->FileName;
+    this->FileName = nullptr;
     }
 
   this->PointDataArraySelection->Delete();
   this->myreader->Delete();
 }
 
-int vtkCSCSAMRReader::CanReadFile(const char* fname )
+int vtkAMRAmazeReader::CanReadFile(const char* fname )
 {
   if (! fname )
     return 0;
-  cout << "vtkCSCSAMRReader::CanReadFile\n";
+  cout << "vtkAMRAmazeReader::CanReadFile\n";
   hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
   hid_t root_id = H5Gopen(f_id, "/", H5P_DEFAULT);
   if(H5Lexists(root_id, "/Grid Info", H5P_DEFAULT))
@@ -100,11 +101,16 @@ int vtkCSCSAMRReader::CanReadFile(const char* fname )
 }
 
 //----------------------------------------------------------------------------
-int vtkCSCSAMRReader::RequestInformation(
+int vtkAMRAmazeReader::RequestInformation(
   vtkInformation* request, 
   vtkInformationVector** inputVector, 
   vtkInformationVector* outputVector)
 {
+  if (this->LoadedMetaData)
+  {
+    return (1);
+  }
+  
   if (!this->Superclass::RequestInformation(request, inputVector, outputVector))
     {
     return 0;
@@ -120,7 +126,12 @@ int vtkCSCSAMRReader::RequestInformation(
 
   vtkOverlappingAMR *output = static_cast<vtkOverlappingAMR *>(
     info->Get(vtkDataObject::DATA_OBJECT()));
-  cout << __LINE__ << " : Got a vtkOverlappingAMR* = " << output << std::endl;
+  if (output == nullptr)
+  {
+    output = vtkOverlappingAMR::New();
+    cout << __LINE__ << " : Got a New vtkOverlappingAMR* = " << output << std::endl;
+  }
+  
   //FILE *fp=NULL;
   int levelId, GridId, i, node_veclen;
   double time, time_scalor;
@@ -137,17 +148,27 @@ int vtkCSCSAMRReader::RequestInformation(
     this->myreader->LengthScaleOff();
 
   this->myreader->ScaleChoice = (ScaleOption)this->ScaleChoice;
-cerr << __LINE__ << "vtkCSCSAMRReader::RequestInformation() Fname = " << this->FileName << "\n";
+cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->FileName << "\n";
   this->myreader->SetFileName(this->FileName);
 
   this->myreader->ReadMetaData();
+
   this->LevelRange[0] = 0;
   this->LevelRange[1] = this->myreader->NumberOfLevels-1;
 
-  this->SetTime(this->GetTime() / this->myreader->TimeScalor);
+  this->SetTime(this->GetTime() / this->myreader->AMAZETimeScalor);
   double localTime = this->GetTime();
-  info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
-
+  double timeRange[2] = {localTime, localTime};
+  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
+  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
+  if (output && output->GetInformation()->Has(vtkDataObject::DATA_TIME_STEP()))
+  {
+  cerr << __LINE__ << "Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS() = " << localTime << "\n";
+  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
+  output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
+  info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
+  }
+  
   for(i=0; i < this->GetNumberOfComponents(); i++)
     {
     this->PointDataArraySelection->AddArray((const char *)this->myreader->Labels[i].label);
@@ -220,11 +241,12 @@ cerr << __LINE__ << "vtkCSCSAMRReader::RequestInformation() Fname = " << this->F
     outputVector->GetInformationObject(0)->Remove(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA());
 
   //output->GetAMRInfo()->Print(cerr);
+  this->LoadedMetaData = true;
   return 1;
 } // end of ExecuteInformation
 
 
-int vtkCSCSAMRReader::RequestData(
+int vtkAMRAmazeReader::RequestData(
   vtkInformation*, vtkInformationVector**, vtkInformationVector* outputVector)
 {
   int  n, nb_stars, record;
@@ -293,6 +315,7 @@ int vtkCSCSAMRReader::RequestData(
   errs.open(fname.str().c_str(),ios::app);
   //delete [] fname.str();
   errs << "piece " << piece << " out of " << numberOfPieces << endl;
+  errs << "time = " << localTime  << endl;
 #endif
 
   int *blocksPerLevel = new int[this->GetNumberOfLevels()];
@@ -457,7 +480,7 @@ int vtkCSCSAMRReader::RequestData(
 
   if(piece == 0)// should only proc 0 read the stars?
     {
-    //cerr << "vtkCSCSAMRReader::RequestData() Load stars\n\n";
+    //cerr << "vtkAMRAmazeReader::RequestData() Load stars\n\n";
 
       vtkInformation* info = outputVector->GetInformationObject(1);
       vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
@@ -467,7 +490,7 @@ int vtkCSCSAMRReader::RequestData(
         }
       else
         {
-        nb_stars = vtkCSCSAMRReader::LoadStars(root_id, output2);
+        nb_stars = vtkAMRAmazeReader::LoadStars(root_id, output2);
         }
     }
 
@@ -476,7 +499,7 @@ int vtkCSCSAMRReader::RequestData(
 } // RequestData
 
 
-int vtkCSCSAMRReader::LoadStars(hid_t root_id,
+int vtkAMRAmazeReader::LoadStars(hid_t root_id,
                                 vtkMultiBlockDataSet* SpherSymStars)
 {
   hid_t    dataset1, dataset2, StarsDS;
@@ -505,7 +528,7 @@ int vtkCSCSAMRReader::LoadStars(hid_t root_id,
 }
 
 //----------------------------------------------------------------------------
-void vtkCSCSAMRReader::PrintSelf(ostream& os, vtkIndent indent)
+void vtkAMRAmazeReader::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
 
@@ -527,17 +550,17 @@ void vtkCSCSAMRReader::PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "Output Ports: " << this->GetNumberOfOutputPorts() << endl;
 }
 
-const char* vtkCSCSAMRReader::GetPointArrayName(int index)
+const char* vtkAMRAmazeReader::GetPointArrayName(int index)
 {
   return this->PointDataArraySelection->GetArrayName(index);
 }
 
-int vtkCSCSAMRReader::GetPointArrayStatus(const char* name)
+int vtkAMRAmazeReader::GetPointArrayStatus(const char* name)
 {
   return this->PointDataArraySelection->ArrayIsEnabled(name);
 }
 
-void vtkCSCSAMRReader::SetPointArrayStatus(const char* name, int status)
+void vtkAMRAmazeReader::SetPointArrayStatus(const char* name, int status)
 {
   if(status)
     {
@@ -549,12 +572,12 @@ void vtkCSCSAMRReader::SetPointArrayStatus(const char* name, int status)
     }
 }
 
-int vtkCSCSAMRReader::GetNumberOfPointArrays()
+int vtkAMRAmazeReader::GetNumberOfPointArrays()
 {
   return this->PointDataArraySelection->GetNumberOfArrays();
 }
 
-int vtkCSCSAMRReader::FillOutputPortInformation(int port, vtkInformation* info)
+int vtkAMRAmazeReader::FillOutputPortInformation(int port, vtkInformation* info)
 {
   if(port == 0)
     info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkOverlappingAMR");
@@ -563,22 +586,22 @@ int vtkCSCSAMRReader::FillOutputPortInformation(int port, vtkInformation* info)
   return 1;
 }
 
-void vtkCSCSAMRReader::Enable(const char* name)
+void vtkAMRAmazeReader::Enable(const char* name)
 {
   this->SetPointArrayStatus(name, 1);
 }
 
-void vtkCSCSAMRReader::Disable(const char* name)
+void vtkAMRAmazeReader::Disable(const char* name)
 {
   this->SetPointArrayStatus(name, 0);
 }
 
-void vtkCSCSAMRReader::EnableAll()
+void vtkAMRAmazeReader::EnableAll()
 {
   this->PointDataArraySelection->EnableAllArrays();
 }
 
-void vtkCSCSAMRReader::DisableAll()
+void vtkAMRAmazeReader::DisableAll()
 {
   this->PointDataArraySelection->DisableAllArrays();
 }
@@ -586,8 +609,8 @@ void vtkCSCSAMRReader::DisableAll()
 
 
 // Get the second output which contains the stars
-//vtkPolyData* vtkCSCSAMRReader::GetStarsOutput()
-vtkMultiBlockDataSet* vtkCSCSAMRReader::GetStarsOutput()
+//vtkPolyData* vtkAMRAmazeReader::GetStarsOutput()
+vtkMultiBlockDataSet* vtkAMRAmazeReader::GetStarsOutput()
 {
   if (this->GetNumberOfOutputPorts() < 3)
     {

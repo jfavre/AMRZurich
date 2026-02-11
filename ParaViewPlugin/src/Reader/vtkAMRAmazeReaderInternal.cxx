@@ -225,7 +225,7 @@ static hid_t Create_SpherSymStar_Compound()
   return id;
 }
 
-vtkPolyData * vtkAMAZEReader::AxisSymStarSource(newstar *astar,
+vtkPolyData * vtkAMRAmazeReaderInternal::AxisSymStarSource(newstar *astar,
                                       struct AxiSymStarCurrent *axiStarData,
                                       int AngleResolution)
 {
@@ -434,10 +434,10 @@ vtkPolyData * vtkAMAZEReader::AxisSymStarSource(newstar *astar,
   return AxiSymStar;
 }
 
-//vtkCxxRevisionMacro(vtkAMAZEReader, "$Revision: 1.0 $");
-vtkStandardNewMacro(vtkAMAZEReader);
+//vtkCxxRevisionMacro(vtkAMRAmazeReaderInternal, "$Revision: 1.0 $");
+vtkStandardNewMacro(vtkAMRAmazeReaderInternal);
 
-vtkAMAZEReader::vtkAMAZEReader()
+vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 {
   //this->FileName = NULL;
   this->file_id = 0;
@@ -471,7 +471,7 @@ vtkAMAZEReader::vtkAMAZEReader()
   this->MappedGrids = NoMap;
 }
 
-vtkAMAZEReader::~vtkAMAZEReader()
+vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
 {
   int i;
   //cerr << "AMAZEDestructor\n";
@@ -497,12 +497,12 @@ vtkAMAZEReader::~vtkAMAZEReader()
 }
 
 /*
-void vtkAMAZEReader::SetFileName( const char * fileName )
+void vtkAMRAmazeReaderInternal::SetFileName( const char * fileName )
 {
   this->FileName = fileName;
 }
 */
-void vtkAMAZEReader::SetFileName(const char* filename)
+void vtkAMRAmazeReaderInternal::SetFileName(const char* filename)
 {
   vtkSetStringBodyMacro(FileName, filename);
   //this->Reset();
@@ -510,7 +510,7 @@ void vtkAMAZEReader::SetFileName(const char* filename)
 
 
 //----------------------------------------------------------------------------
-void vtkAMAZEReader::ReadMetaData()
+void vtkAMRAmazeReaderInternal::ReadMetaData()
 {
   //FILE *fp=NULL;
   int levelId, GridId, i, node_veclen;
@@ -597,7 +597,7 @@ void vtkAMAZEReader::ReadMetaData()
 Added the Logical to Physical mappers def.
 May 23, 2011
 */
-void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
+void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
 {
   hid_t   root_id, dataset, adG_grid_id, mapping_id, label1, label2, unitstring;
   herr_t  status;
@@ -785,7 +785,7 @@ void vtkAMAZEReader::ReadHDF5GridsMetaData(bool shiftedGrid)
     }
 } // ReadHDF5GridsMetaData()
 
-void vtkAMAZEReader::ReadHDF5VariablesMetaData()
+void vtkAMRAmazeReaderInternal::ReadHDF5VariablesMetaData()
 {
   hid_t   root_id, dataset, adG_component_id, labelstring, unitstring;
   herr_t  status;
@@ -826,7 +826,7 @@ void vtkAMAZEReader::ReadHDF5VariablesMetaData()
 
 // deciding on adding the Log10 prefix to the name can only be done after UpdateInformation
 // so we make this a separate call
-void vtkAMAZEReader::MakeVariableNames()
+void vtkAMRAmazeReaderInternal::MakeVariableNames()
 {
   for(int c=0; c < this->NumberOfComponents; c++)
     {
@@ -855,7 +855,7 @@ void vtkAMAZEReader::MakeVariableNames()
     }
 }
 
-void vtkAMAZEReader::ReadHDF5MetaData()
+void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
 {
   hid_t   root_id;
   hid_t   attr1;
@@ -891,7 +891,7 @@ void vtkAMAZEReader::ReadHDF5MetaData()
     vtkGenericWarningMacro("Failed to open Time Attribute " << endl);
     return;
   }
-  else cout << "vtkAMAZEReader::ReadHDF5MetaData read Time = " << this->AMAZETime << endl;
+  else cout << "vtkAMRAmazeReaderInternal::ReadHDF5MetaData read Time = " << this->AMAZETime << endl;
   status = H5Aclose(attr1);
     //cerr << "AMR::RequestInformation for time " << this->AMAZETime << endl;
 
@@ -904,7 +904,7 @@ void vtkAMAZEReader::ReadHDF5MetaData()
     {
     status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->LengthScaleFactor);
     status = H5Aclose(attr1);
-    //cerr << "vtkAMAZEReader::RequestInformation for LengthScaleFactor " << this->LengthScaleFactor << endl;
+    //cerr << "vtkAMRAmazeReaderInternal::RequestInformation for LengthScaleFactor " << this->LengthScaleFactor << endl;
     }
   else
     this->LengthScaleFactor = 1.0;
@@ -954,7 +954,7 @@ void vtkAMAZEReader::ReadHDF5MetaData()
   H5Eset_auto2(H5E_DEFAULT, func, client_data);
 }
 
-vtkDoubleArray* vtkAMAZEReader::ReadVisItVar(int domain, const char *varname)
+vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *varname)
 {
 // find which adG_component that is and then go ahead
   int i=0, level, block;
@@ -975,7 +975,7 @@ vtkDoubleArray* vtkAMAZEReader::ReadVisItVar(int domain, const char *varname)
 }
 
 
-vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &variable)
+vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_component &variable)
 {
   hid_t level_root_id, grid_root_id, dataset_id, status, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
@@ -1079,7 +1079,7 @@ vtkDoubleArray* vtkAMAZEReader::ReadVar(int levelId, int block, adG_component &v
   return scalars;
 }
 
-void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variable)
+void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_component &variable)
 {
   hid_t level_root_id, grid_root_id, dataset_id, status, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
@@ -1141,7 +1141,7 @@ void vtkAMAZEReader::CheckVarSize(int levelId, int block, adG_component &variabl
 // so we use that for the method's signature and we calculate the domain-id
 // domain-id is between 0 and N-1
 
-vtkUniformGrid* vtkAMAZEReader::ReadUniformGrid(int levelId, int block)
+vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int block)
 {
   int domain = this->FindDomainId(levelId, block);
   adG_grid grid = this->Grids[domain];
@@ -1218,7 +1218,7 @@ map_rtp2xyz(double R, double T, double P,
 //cerr << " " << R << " " << T << " " << P << " => " << *x << " " << *y << " " << *z << endl;
 }
 
-vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid(int domain)
+vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
 {
   int I, nvals, levelId, blockId;
   double x, y, z;
@@ -1464,7 +1464,7 @@ map_c2p_fig32d(double xc, double yc, double zc, double R1,
 //cerr << " " << R << " " << T << " " << P << " => " << *x << " " << *y << " " << *z << endl;
 }
 
-vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid2(int domain)
+vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
 {
   int I, nvals, levelId, blockId;
   double x, y, z;
@@ -1674,7 +1674,7 @@ vtkStructuredGrid* vtkAMAZEReader::ReadStructuredGrid2(int domain)
   return sg;
 } // ReadStructuredGrid2
 
-vtkRectilinearGrid* vtkAMAZEReader::ReadRectilinearGrid(int domain)
+vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
 {
   int i, levelId, blockId;
 
@@ -1786,7 +1786,7 @@ cerr << "RG: of size " << grid.dimensions[0] << "x"<<
 } // ReadRectilinearGrid()
 
 // returns the level and block id at that level for the given global id
-void  vtkAMAZEReader::FindLevelAndBlock(int domain, int &level, int &block) const
+void  vtkAMRAmazeReaderInternal::FindLevelAndBlock(int domain, int &level, int &block) const
 {
   int gid = domain;
   int l=0;
@@ -1800,7 +1800,7 @@ void  vtkAMAZEReader::FindLevelAndBlock(int domain, int &level, int &block) cons
   block = gid;
 }
 
-int vtkAMAZEReader::GetBlockLevel(const int domain) const
+int vtkAMRAmazeReaderInternal::GetBlockLevel(const int domain) const
 {
   int gid = domain;
   int l=0;
@@ -1815,7 +1815,7 @@ int vtkAMAZEReader::GetBlockLevel(const int domain) const
 
 
 // returns the global id for the given block
-int vtkAMAZEReader::FindDomainId(int level, int block)
+int vtkAMRAmazeReaderInternal::FindDomainId(int level, int block)
 {
   int domain = 0;
   for(int l=0; l < level; l++)
@@ -1826,7 +1826,7 @@ int vtkAMAZEReader::FindDomainId(int level, int block)
   return domain;
 }
 
-void vtkAMAZEReader::GetSpacing(int level, double *spacing)
+void vtkAMRAmazeReaderInternal::GetSpacing(int level, double *spacing)
 {
   int domain = this->FindDomainId(level, 0);
   adG_grid g = this->Grids[domain];
@@ -1863,7 +1863,7 @@ void vtkAMAZEReader::GetSpacing(int level, double *spacing)
       }
 }
 
-void vtkAMAZEReader::PrintSelf(ostream& os, vtkIndent indent)
+void vtkAMRAmazeReaderInternal::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
 
@@ -1891,14 +1891,14 @@ void vtkAMAZEReader::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 
-vtkPolyData* vtkAMAZEReader::GetStar(int domain)
+vtkPolyData* vtkAMRAmazeReaderInternal::GetStar(int domain)
 {
   return this->Stars[domain];
 }
 
 #define THETARES 48
 #define PHIRES 24
-int vtkAMAZEReader::BuildStars()
+int vtkAMRAmazeReaderInternal::BuildStars()
 {
   hid_t    apr_root_id, dataset1, dataset2, StarsDS, models_root_id;
   hid_t    attr1, attr2, interactions_root_id;
@@ -1980,7 +1980,7 @@ int vtkAMAZEReader::BuildStars()
   dataset2 = H5Dopen(models_root_id, "Stars: Present State", H5P_DEFAULT);
   if(dataset2 >=0) // old-style stars before november 6, 2008
     {
-    cerr << "vtkAMAZEReader::BuildStars(Old-style STARS)\n";
+    cerr << "vtkAMRAmazeReaderInternal::BuildStars(Old-style STARS)\n";
     dataspace = H5Dget_space(dataset2);
     status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
     this->NumberOfSphericallySymmetricStars = nb_stars = dims_out[0];

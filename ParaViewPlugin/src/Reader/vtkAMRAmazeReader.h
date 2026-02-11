@@ -14,7 +14,7 @@ class vtkDoubleArray;
 
 #include "vtkOverlappingAMRAlgorithm.h"
 #include "AMAZEReaderModule.h" // for export macro
-#include "vtkAMAZEReader.h"
+#include "vtkAMRAmazeReaderInternal.h"
 
 #include <vector> // Needed for vector ivar
 #include <map>
@@ -119,7 +119,7 @@ protected:
   int MaxLevelRead;
   int MinLevelRead;
   unsigned int MaximumLevelsToReadByDefault;
-  vtkAMAZEReader *myreader;
+  vtkAMRAmazeReaderInternal *myreader;
   bool LoadedMetaData;
   vtkDataArraySelection* PointDataArraySelection;
 

@@ -2,8 +2,8 @@
 // .SECTION Description
 // This is an experimental CSCSAMR file reader. 
 
-#ifndef __vtkAMAZEReaderInternal_h
-#define __vtkAMAZEReaderInternal_h
+#ifndef __vtkAMRAmazeReaderInternalInternal_h
+#define __vtkAMRAmazeReaderInternalInternal_h
 
 class vtkPolyData;
 class vtkUniformGrid;
@@ -116,12 +116,12 @@ typedef struct DCR_Mapping
   int      Dimension;
 } DCR_Mapping;
 
-class vtkAMAZEReader: public vtkObject
+class vtkAMRAmazeReaderInternal: public vtkObject
 {
 public:
-  vtkTypeMacro(vtkAMAZEReader, vtkObject);
+  vtkTypeMacro(vtkAMRAmazeReaderInternal, vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent);
-  static vtkAMAZEReader* New();
+  static vtkAMRAmazeReaderInternal* New();
 
   //void SetFileName( const char * fileName );
   virtual void SetFileName(VTK_FILEPATH const char* filename);
@@ -219,8 +219,8 @@ public:
   double LengthScaleFactor;
 
 protected:
-  vtkAMAZEReader();
-  ~vtkAMAZEReader();
+  vtkAMRAmazeReaderInternal();
+  ~vtkAMRAmazeReaderInternal();
   // The input file's name.
   hid_t file_id;
   //std::string FileName;

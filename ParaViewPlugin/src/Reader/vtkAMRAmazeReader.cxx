@@ -64,7 +64,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
   this->GetExecutive()->SetOutputData(1, pd);
   pd->Delete();
 // this is for port number 1 which we do in all cases.
-  this->myreader = vtkAMAZEReader::New();
+  this->myreader = vtkAMRAmazeReaderInternal::New();
 }
 
 vtkAMRAmazeReader::~vtkAMRAmazeReader()

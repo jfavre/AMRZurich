@@ -533,7 +533,6 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
     }
   this->ReadHDF5MetaData();
   //cout << "done with ReadHDF5MetaData() " << endl;
-  this->SetAMAZETime(this->GetAMAZETime() / this->AMAZETimeScalor);
 
   //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &this->Time, 1);
 
@@ -583,10 +582,12 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
   int firstLevel = this->MinLevelRead;
   int lastLevel = this->MaxLevelRead;
 
+  /*
   cout << __LINE__ << "\tDimensionality: " << this->Dimensionality 
                  << "\n\tNumberOfComponents: " << this->NumberOfComponents
                  << "\n\tNumberOfLevels: " << this->NumberOfLevels
                  << "\n\tNumberOfGrids: " << this->NumberOfGrids << endl;
+  */
   //grid = this->Grids;
   //int size = grid[0].dimensions[0];
 
@@ -887,16 +888,23 @@ void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
   attr1 = H5Aopen_name(root_id, "Time");
   status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->AMAZETime);
   if (status < 0)
-  {
+    {
     vtkGenericWarningMacro("Failed to open Time Attribute " << endl);
     return;
-  }
-  else cout << "vtkAMRAmazeReaderInternal::ReadHDF5MetaData read Time = " << this->AMAZETime << endl;
+    }
+  //else
+    //cout << "vtkAMRAmazeReaderInternal::ReadHDF5MetaData read Time = " << this->AMAZETime << endl;
   status = H5Aclose(attr1);
     //cerr << "AMR::RequestInformation for time " << this->AMAZETime << endl;
 
   attr1 = H5Aopen_name(root_id, "Time Scaling Factor");
   status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &AMAZETimeScalor);
+  if (status < 0)
+    {
+    vtkGenericWarningMacro("Failed to open Time Scaling Factor Attribute " << endl);
+    }
+  else
+    this->AMAZETime /= this->AMAZETimeScalor;
   status = H5Aclose(attr1);
 
   attr1 = H5Aopen_name(root_id, "Length Scale Factor");
@@ -904,7 +912,6 @@ void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
     {
     status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->LengthScaleFactor);
     status = H5Aclose(attr1);
-    //cerr << "vtkAMRAmazeReaderInternal::RequestInformation for LengthScaleFactor " << this->LengthScaleFactor << endl;
     }
   else
     this->LengthScaleFactor = 1.0;

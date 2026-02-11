@@ -4,7 +4,6 @@ VTK_MODULE_INIT(vtkRenderingOpenGL2);
 VTK_MODULE_INIT(vtkInteractionStyle);
 #include "vtkAMRAmazeReader.h"
 #include "vtkOverlappingAMR.h"
-#include "vtkArrayCalculator.h"
 #include "vtkCamera.h"
 #include "vtkClipDataSet.h"
 #include "vtkCompositeDataPipeline.h"
@@ -39,7 +38,7 @@ using namespace std;
 #define VTK_CREATE(type, var) \
   vtkSmartPointer<type> var = vtkSmartPointer<type>::New();
 
-//#define ALL 1
+#define ALL 1
 
 int main(int argc, char **argv)
 {

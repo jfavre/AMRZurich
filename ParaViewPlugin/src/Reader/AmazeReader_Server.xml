@@ -115,6 +115,8 @@
        </ArraySelectionDomain>
      </StringVectorProperty>
 
+
+
     </Proxy>
     <!-- end of "internal_sources" -->
   </ProxyGroup>
@@ -146,7 +148,6 @@
           <Property name="ShiftedGrid"/>
           <Property name="LengthScale"/>
           <Property name="BoxLength"/>
-
         </ExposedProperties>
       </SubProxy>
 

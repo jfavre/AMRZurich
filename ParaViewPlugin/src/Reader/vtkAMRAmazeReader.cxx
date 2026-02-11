@@ -100,23 +100,22 @@ int vtkAMRAmazeReader::CanReadFile(const char* fname )
     }
 }
 
+
 //----------------------------------------------------------------------------
 int vtkAMRAmazeReader::RequestInformation(
   vtkInformation* request, 
   vtkInformationVector** inputVector, 
   vtkInformationVector* outputVector)
 {
-  if (this->LoadedMetaData)
-  {
-    return (1);
-  }
-  
   if (!this->Superclass::RequestInformation(request, inputVector, outputVector))
     {
     return 0;
     }
 
-  cerr << "Begin RequestInformation\n";
+  //if (this->LoadedMetaData)
+  //{
+    //return (1);
+  //}
 
   vtkInformation* info = outputVector->GetInformationObject(0);
   //info->Set(vtkStreamingDemandDrivenPipeline::MAXIMUM_NUMBER_OF_PIECES(), -1);
@@ -129,7 +128,7 @@ int vtkAMRAmazeReader::RequestInformation(
   if (output == nullptr)
   {
     output = vtkOverlappingAMR::New();
-    cout << __LINE__ << " : Got a New vtkOverlappingAMR* = " << output << std::endl;
+    //cout << __LINE__ << " : Got a New vtkOverlappingAMR* = " << output << std::endl;
   }
   
   //FILE *fp=NULL;
@@ -148,7 +147,7 @@ int vtkAMRAmazeReader::RequestInformation(
     this->myreader->LengthScaleOff();
 
   this->myreader->ScaleChoice = (ScaleOption)this->ScaleChoice;
-cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->FileName << "\n";
+  //cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->FileName << "\n";
   this->myreader->SetFileName(this->FileName);
 
   this->myreader->ReadMetaData();
@@ -156,18 +155,15 @@ cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->
   this->LevelRange[0] = 0;
   this->LevelRange[1] = this->myreader->NumberOfLevels-1;
 
-  this->SetTime(this->GetTime() / this->myreader->AMAZETimeScalor);
   double localTime = this->GetTime();
   double timeRange[2] = {localTime, localTime};
   info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
   info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
-  if (output && output->GetInformation()->Has(vtkDataObject::DATA_TIME_STEP()))
-  {
-  cerr << __LINE__ << "Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS() = " << localTime << "\n";
-  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
+
+  //cerr << __LINE__ << "Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS() = " << localTime << "\n";
+  info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
   output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
   info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
-  }
   
   for(i=0; i < this->GetNumberOfComponents(); i++)
     {
@@ -198,8 +194,6 @@ cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->
 
   int current_level = -1;
   std::vector<adG_grid> &grid = this->myreader->Grids;
-
-  // pre-6.0 output->SetNumberOfLevels(this->GetNumberOfLevels());
 
   double spacing[3];
   int globalBoxId = 0;
@@ -277,6 +271,11 @@ int vtkAMRAmazeReader::RequestData(
     this->myreader->LengthScaleOff();
 
   vtkInformation* info = outputVector->GetInformationObject(0);
+  
+  double requestedTime = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_TIME_STEP());
+  cout << __LINE__ << ": requestedTime = " << requestedTime << endl;
+  int length = info->Length(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
+
   bool has_block_requests =
     info->Has(vtkCompositeDataPipeline::LOAD_REQUESTED_BLOCKS()) != 0;
   vtkOverlappingAMR* output = vtkOverlappingAMR::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
@@ -295,16 +294,14 @@ int vtkAMRAmazeReader::RequestData(
       //this->Internal->UpdateIndices = std::set<int>(idx, idx+length);
       }
   }
-  //double steps[1] = 1.234;
-  //output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEPS(), steps, 1);
-				  
+
   //vtkTimerLog *timer0 = vtkTimerLog::New();
   //timer0->StartTimer();
   int piece = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER());
   int numberOfPieces = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES());
 
-  double localTime = this->GetTime();
-  output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
+  //double localTime = this->GetTime();
+  output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), this->myreader->AMAZETime);
 
   unsigned int numLevels = this->GetNumberOfLevels();
   int i, levelId, g = 0;
@@ -315,7 +312,7 @@ int vtkAMRAmazeReader::RequestData(
   errs.open(fname.str().c_str(),ios::app);
   //delete [] fname.str();
   errs << "piece " << piece << " out of " << numberOfPieces << endl;
-  errs << "time = " << localTime  << endl;
+  //errs << "time = " << localTime  << endl;
 #endif
 
   int *blocksPerLevel = new int[this->GetNumberOfLevels()];
@@ -495,6 +492,7 @@ int vtkAMRAmazeReader::RequestData(
     }
 
   this->UpdateProgress(1.0);
+  cout << "=================================================================\n";
   return 1;
 } // RequestData
 
@@ -502,28 +500,17 @@ int vtkAMRAmazeReader::RequestData(
 int vtkAMRAmazeReader::LoadStars(hid_t root_id,
                                 vtkMultiBlockDataSet* SpherSymStars)
 {
-  hid_t    dataset1, dataset2, StarsDS;
-  hid_t    attr1, attr2;
-  herr_t   status;
-
-  int  i, j, nb_stars, nb_SpherSymStars=0, nb_AxiSymStars=0;
-  herr_t error;
-  H5E_auto2_t func;
-  void *client_data;
-  H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
-  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+  int i, nb_stars;
 
   this->myreader->BuildStars();
-
-  for(int i=0; i < this->myreader->NumberOfSphericallySymmetricStars+this->myreader->NumberOfAxisSymmetricStars; i++)
+  nb_stars = this->myreader->NumberOfSphericallySymmetricStars + this->myreader->NumberOfAxisSymmetricStars;
+  for(i=0; i < nb_stars; i++)
     {
     SpherSymStars->SetBlock(i, this->myreader->Stars[i]);
 
     SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->myreader->Stars[i]->GetFieldData()->GetArray(0)->GetName());
     }
 
-  //H5Gclose(apr_root_id);
-  H5Eset_auto2(H5E_DEFAULT, func, client_data);
   return nb_stars;
 }
 
@@ -605,8 +592,6 @@ void vtkAMRAmazeReader::DisableAll()
 {
   this->PointDataArraySelection->DisableAllArrays();
 }
-
-
 
 // Get the second output which contains the stars
 //vtkPolyData* vtkAMRAmazeReader::GetStarsOutput()

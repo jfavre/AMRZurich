@@ -79,10 +79,11 @@ vtkAMRAmazeReader::~vtkAMRAmazeReader()
   this->myreader->Delete();
 }
 
-int vtkAMRAmazeReader::CanReadFile(const char* fname )
+vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname )
 {
   if (! fname )
-    return 0;
+    return false;
+    /*
   cout << "vtkAMRAmazeReader::CanReadFile\n";
   hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
   hid_t root_id = H5Gopen(f_id, "/", H5P_DEFAULT);
@@ -90,14 +91,15 @@ int vtkAMRAmazeReader::CanReadFile(const char* fname )
     {
       H5Gclose(root_id);
       H5Fclose(f_id);
-      return 1;
+      return true;
     }
   else
     {
     H5Gclose(root_id);
     H5Fclose(f_id);
-    return 0;
+    return false;
     }
+    */return true;
 }
 
 

@@ -479,7 +479,7 @@ vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
     
   for(i=0; i < this->Stars.size(); i++)
     {
-    //(this->Stars[i])->Delete();
+    (this->Stars[i])->Delete();
     }
   this->Stars.clear();
   
@@ -524,7 +524,7 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
     //vtkErrorMacro(<< "Must specify adG file");
     return;
     }
-  cout << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
+  //cout << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   if(this->file_id<0)
     {
@@ -552,7 +552,7 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
     {
     H5Fclose(this->file_id);
     this->file_id = 0;
-    cout << __LINE__ << ": H5Fclose( " << this->FileName << ")\n";
+    //cout << __LINE__ << ": H5Fclose( " << this->FileName << ")\n";
     }
 
 ///////////////////////////////////////////////////////////////////

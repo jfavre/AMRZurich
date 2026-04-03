@@ -88,7 +88,7 @@ public:
   int GridsPerLevels(int l){return myreader->Levels[l].GridsPerLevel;};
   vtkSetMacro(MaximumLevelsToReadByDefault, unsigned int);
   vtkGetMacro(MaximumLevelsToReadByDefault, unsigned int);
-  int CanReadFile(const char* fname);
+  vtkTypeBool CanReadFile(VTK_FILEPATH const char* fname);
 
 protected:
   vtkAMRAmazeReader();

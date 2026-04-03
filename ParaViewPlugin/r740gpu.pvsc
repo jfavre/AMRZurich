@@ -1,0 +1,16 @@
+<Servers>
+  <Server name="r740gpu" configuration="" resource="csrc://r740visu:64999" timeout="-1">
+    <CommandStartup>
+      <Command process_wait="0" delay="0" exec="ssh">
+        <Arguments>
+          <Argument value="&#x22;-R"/>
+          <Argument value="$PV_SERVER_PORT$:localhost:$PV_SERVER_PORT$&#x22;"/>
+          <Argument value="r740gpu02"/>
+          <Argument value="&#x22;/home/jfavre/apps/PV/6.1/bin/pvserver"/>
+          <Argument value="--reverse-connection"/>
+          <Argument value="&#x22;--server-port=64999&#x22;"/>
+        </Arguments>
+      </Command>
+    </CommandStartup>
+  </Server>
+</Servers>

@@ -38,7 +38,7 @@ using namespace std;
 #define VTK_CREATE(type, var) \
   vtkSmartPointer<type> var = vtkSmartPointer<type>::New();
 
-#define ALL 1
+//#define ALL 1
 
 int main(int argc, char **argv)
 {
@@ -50,8 +50,14 @@ int main(int argc, char **argv)
   timer->StartTimer();
 
   VTK_CREATE(vtkAMRAmazeReader, reader);
-  reader->SetFileName("/local/data/Walder/jet3d.amr5");
-  reader->DebugOff();
+  if(argc < 2)
+    {
+    std::cerr << "missing a filename argument: Syntax ./bin/TestJet3D <path-to>/jet3d.amr5\n";
+    exit(1);
+    }
+  std::cout << "Opening " <<  argv[1] << std::endl;
+  reader->SetFileName(argv[1]);
+  reader->DebugOn();
   reader->DataScaleOn();
   reader->LogDataOn();
   reader->UpdateInformation();
@@ -60,6 +66,7 @@ int main(int argc, char **argv)
   //reader->SetPhysicalSpaceScale(1.0);
   //reader->SetPointArrayStatus("Magnetic field", 0);
   reader->SetLevelRead(0, 4);
+  reader->DebugOff();
   reader->Update();
   //static_cast<vtkOverlappingAMR*>(reader->GetOutput())->Audit();
   //reader->GetOutput()->Print(cout);

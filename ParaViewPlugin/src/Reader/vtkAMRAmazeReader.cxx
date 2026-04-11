@@ -181,18 +181,18 @@ int vtkAMRAmazeReader::RequestInformation(
       //cerr << "found PointDataArray " << this->myreader->Labels[i].label << " [" << this->myreader->Labels[i].unit << "]\n";
       }
     }
-  int *blocksPerLevel = new int[this->GetNumberOfLevels()];
+  std::vector<unsigned int> blocksPerLevel;
+  blocksPerLevel.reserve(this->GetNumberOfLevels());
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
     {
-    blocksPerLevel[levelId] = this->GridsPerLevels(levelId);
+    blocksPerLevel.push_back(this->GridsPerLevels(levelId));
     }
-  output->Initialize(this->GetNumberOfLevels(), blocksPerLevel);
+  output->Initialize(blocksPerLevel);
   output->SetOrigin(this->myreader->Grids[0].origin);
   if(this->myreader->GetDimensionality() == 2)
-    output->SetGridDescription(VTK_XY_PLANE);
+    output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else
-    output->SetGridDescription(VTK_XYZ_GRID);
-  delete [] blocksPerLevel;
+    output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XYZ_GRID);
 
   int current_level = -1;
   std::vector<adG_grid> &grid = this->myreader->Grids;
@@ -317,18 +317,18 @@ int vtkAMRAmazeReader::RequestData(
   //errs << "time = " << localTime  << endl;
 #endif
 
-  int *blocksPerLevel = new int[this->GetNumberOfLevels()];
+  std::vector<unsigned int> blocksPerLevel;
+  blocksPerLevel.reserve(this->GetNumberOfLevels());
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
     {
-    blocksPerLevel[levelId] = this->GridsPerLevels(levelId);
+    blocksPerLevel.push_back(this->GridsPerLevels(levelId));
     }
-  output->Initialize(this->GetNumberOfLevels(), blocksPerLevel);
+  output->Initialize(blocksPerLevel);
   output->SetOrigin(this->myreader->Grids[0].origin);
   if(this->myreader->GetDimensionality() == 2)
-    output->SetGridDescription(VTK_XY_PLANE);
+    output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else
-    output->SetGridDescription(VTK_XYZ_GRID);
-  delete [] blocksPerLevel;
+    output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XYZ_GRID);
 
   // Make sure to set the number of levels and number of datasets for
   // each level. This guarantees that this is set properly on all

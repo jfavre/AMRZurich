@@ -942,7 +942,8 @@ void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
     hid_t t1 = H5Aget_type(attr1);
     char map_type[30];
     status = H5Aread(attr1, t1, map_type);
-    H5Tclose(t1); cerr << map_type<<endl;
+    H5Tclose(t1);
+
     if(!strncmp(map_type, "Sphere-LogR", 11))
       {
       this->MappedGrids = Sphere_LogR;

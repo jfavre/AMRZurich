@@ -188,7 +188,7 @@ int vtkAMRAmazeReader::RequestInformation(
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
     }
   output->Initialize(blocksPerLevel);
-  output->SetOrigin(this->myreader->Grids[0].origin);
+  output->SetOrigin(this->myreader->Grids[0].layout.origin);
   if(this->myreader->GetDimensionality() == 2)
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else
@@ -324,7 +324,7 @@ int vtkAMRAmazeReader::RequestData(
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
     }
   output->Initialize(blocksPerLevel);
-  output->SetOrigin(this->myreader->Grids[0].origin);
+  output->SetOrigin(this->myreader->Grids[0].layout.origin);
   if(this->myreader->GetDimensionality() == 2)
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else

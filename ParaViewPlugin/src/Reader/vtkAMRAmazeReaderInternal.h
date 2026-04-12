@@ -33,13 +33,18 @@ enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres};
 #define adG_BINARY		0
 #define adG_ASCII		1
 
-typedef struct adG_grid
- {
+typedef struct adG_grid_layout
+  {
   int       grid_nr;                   // number of grid, part of filename
   int       level;                     // level to which grid belongs
   int       dimensions[adG_MAXDIM];    // array with nx, ny (, nz)
   double    origin[2*adG_MAXDIM];      // min (followed by max) grid extent*/
   int       box_corners[2*adG_MAXDIM]; // min (followed by max) grid extent in cell indices with 
+} adG_grid_layout;
+
+typedef struct adG_grid
+  {
+  adG_grid_layout layout;
   vtkAMRBox amrbox;
 } adG_grid;
 

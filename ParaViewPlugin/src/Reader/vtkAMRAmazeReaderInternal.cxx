@@ -277,7 +277,7 @@ vtkPolyData * vtkAMRAmazeReaderInternal::AxisSymStarSource(newstar *astar,
   newNormals->SetName("Normals");
 
   newPolys = vtkCellArray::New();
-  newPolys->Allocate(newPolys->EstimateSize(numPolys, 3));
+  newPolys->AllocateExact(numPolys, 3);
 
   //cerr << "  Center "             << Center[0]  << ", " << Center[1]  << ", " << Center[2]  << endl;
 
@@ -561,10 +561,10 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
 
   for (i = 0; i < this->NumberOfGrids; i++)
     {
-    this->Grids[i].amrbox = vtkAMRBox(grid[i].box_corners, grid[i].box_corners+3);
-    if(this->Grids[i].level != current_level)
+    this->Grids[i].amrbox = vtkAMRBox(grid[i].layout.box_corners, grid[i].layout.box_corners+3);
+    if(this->Grids[i].layout.level != current_level)
       { // first grid of a given level
-      current_level = this->Grids[i].level;
+      current_level = this->Grids[i].layout.level;
       this->Levels[current_level].GridsPerLevel = 1;
       }
     else
@@ -634,8 +634,8 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
     }
   adG_grid_id = H5Tcreate (H5T_COMPOUND, sizeof(adG_grid));
 
-  H5Tinsert(adG_grid_id, "grid number", offsetof(adG_grid, grid_nr), H5T_NATIVE_INT);
-  H5Tinsert(adG_grid_id, "level", HOFFSET(adG_grid, level), H5T_NATIVE_INT);
+  H5Tinsert(adG_grid_id, "grid number", offsetof(adG_grid_layout, grid_nr), H5T_NATIVE_INT);
+  H5Tinsert(adG_grid_id, "level", HOFFSET(adG_grid_layout, level), H5T_NATIVE_INT);
 
   dim[0] = adG_MAXDIM;
   array0_id = H5Tarray_create2(H5T_NATIVE_INT, 1, dim);
@@ -646,10 +646,10 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
   dim[0] = 2 * adG_MAXDIM;
   array2_id = H5Tarray_create2(H5T_NATIVE_INT, 1, dim);
 
-  H5Tinsert(adG_grid_id, "dimensions", HOFFSET(adG_grid, dimensions),
+  H5Tinsert(adG_grid_id, "dimensions", HOFFSET(adG_grid_layout, dimensions),
             array0_id);
-  H5Tinsert(adG_grid_id, "origin", HOFFSET(adG_grid, origin), array1_id);
-  H5Tinsert(adG_grid_id, "box corners", HOFFSET(adG_grid, box_corners), array2_id);
+  H5Tinsert(adG_grid_id, "origin", HOFFSET(adG_grid_layout, origin), array1_id);
+  H5Tinsert(adG_grid_id, "box corners", HOFFSET(adG_grid_layout, box_corners), array2_id);
 
   H5Tclose(array0_id);
   H5Tclose(array1_id);
@@ -1000,7 +1000,7 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   if(level_root_id < 0)
     cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
 
-  grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.grid_nr).c_str(), H5P_DEFAULT);
+  grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.layout.grid_nr).c_str(), H5P_DEFAULT);
   if(grid_root_id < 0)
     cerr << __LINE__<< ": ReadVar(): bad grid_root_id returned\n";
 
@@ -1014,18 +1014,18 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   int nvals;
   if(GetCellCentered())
     {
-    if(grid.dimensions[2] != 1)
-      nvals = (grid.dimensions[0]-1) * (grid.dimensions[1]-1) * (grid.dimensions[2]-1);
+    if(grid.layout.dimensions[2] != 1)
+      nvals = (grid.layout.dimensions[0]-1) * (grid.layout.dimensions[1]-1) * (grid.layout.dimensions[2]-1);
     else
-      nvals = (grid.dimensions[0]-1) * (grid.dimensions[1]-1);
+      nvals = (grid.layout.dimensions[0]-1) * (grid.layout.dimensions[1]-1);
     }
   else
-    nvals = grid.dimensions[0] * grid.dimensions[1] * grid.dimensions[2];
+    nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
 /*
   cerr << lname << ":" << PVlabels[(const char *)variable.label] << "("<< variable.vec_len << "," << nvals << ")\n";
-  cerr << "nvals = " << grid.dimensions[0] << "x"<<
-                    grid.dimensions[1]<< "x"<<
-                    grid.dimensions[2]<< endl;
+  cerr << "nvals = " << grid.layout.dimensions[0] << "x"<<
+                    grid.layout.dimensions[1]<< "x"<<
+                    grid.layout.dimensions[2]<< endl;
 */
   hsize_t dims[2], count[2], offset[2];
   dims[0] = nvals;
@@ -1103,19 +1103,19 @@ void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_compone
     cerr << "bad level_root_id returned\n";
   else
     {
-    std::string lname = std::format("Grid {}", grid.grid_nr);
+    std::string lname = std::format("Grid {}", grid.layout.grid_nr);
     if(H5Lexists(level_root_id, lname.c_str(), H5P_DEFAULT))
       {
       grid_root_id = H5Gopen(level_root_id, lname.c_str(), H5P_DEFAULT);
       if(grid_root_id < 0)
         cerr << "ReadVar(): bad grid_root_id returned\n";
 
-      int nvals = grid.dimensions[0] * grid.dimensions[1] * grid.dimensions[2];
+      int nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
   /*
   cerr << lname << ":" << PVlabels[(const char *)variable.label] << "("<< variable.vec_len << "," << nvals << ")\n";
-  cerr << "nvals = " << grid.dimensions[0] << "x"<<
-                    grid.dimensions[1]<< "x"<<
-                    grid.dimensions[2]<< endl;
+  cerr << "nvals = " << grid.layout.dimensions[0] << "x"<<
+                    grid.layout.dimensions[1]<< "x"<<
+                    grid.layout.dimensions[2]<< endl;
 */
       dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
       if(dataset_id < 0)
@@ -1165,7 +1165,7 @@ vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int bloc
   sarr->SetNumberOfComponents(1);
   sarr->SetNumberOfTuples(1);
 
-  sarr->SetValue(0, std::format("Grid {}", grid.grid_nr));
+  sarr->SetValue(0, std::format("Grid {}", grid.layout.grid_nr));
   vtkUniformGrid* ug = vtkUniformGrid::New();
   ug->Initialize();
   ug->GetFieldData()->AddArray(sarr);
@@ -1181,7 +1181,7 @@ vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int bloc
   if(this->LengthScale)
     cerr << "LengthScaleFactor = " << this->LengthScaleFactor<<"\n";
 */
-  if(grid.dimensions[2] > 1)  // a 3D grid
+  if(grid.layout.dimensions[2] > 1)  // a 3D grid
     {
     if(this->LengthScale)
        ug->SetSpacing(dx[0]/this->LengthScaleFactor,
@@ -1199,18 +1199,18 @@ vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int bloc
     else
       ug->SetSpacing(dx[0], dx[1], 0.0);
     }
-  //ug->SetWholeExtent(0, grid.dimensions[0]-1,
-                     //0, grid.dimensions[1]-1,
-                     //0, grid.dimensions[2]-1);
+  //ug->SetWholeExtent(0, grid.layout.dimensions[0]-1,
+                     //0, grid.layout.dimensions[1]-1,
+                     //0, grid.layout.dimensions[2]-1);
   if(this->LengthScale)
-    ug->SetOrigin(grid.origin[0]/this->LengthScaleFactor,
-                  grid.origin[1]/this->LengthScaleFactor,
-                  grid.origin[2]/this->LengthScaleFactor);
+    ug->SetOrigin(grid.layout.origin[0]/this->LengthScaleFactor,
+                  grid.layout.origin[1]/this->LengthScaleFactor,
+                  grid.layout.origin[2]/this->LengthScaleFactor);
   else
-    ug->SetOrigin(grid.origin[0], grid.origin[1], grid.origin[2]);
-  ug->SetDimensions(grid.dimensions[0],
-                    grid.dimensions[1],
-                    grid.dimensions[2]);
+    ug->SetOrigin(grid.layout.origin[0], grid.layout.origin[1], grid.layout.origin[2]);
+  ug->SetDimensions(grid.layout.dimensions[0],
+                    grid.layout.dimensions[1],
+                    grid.layout.dimensions[2]);
 
   return ug;
 } // ReadUniformGrid
@@ -1238,15 +1238,15 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
   dx[2] = this->Levels[levelId].DXs[2];
 
 /*
-  cerr << "Phi ranges from "    << grid.origin[2] << " to " << grid.origin[5] << " with increment " << dx[2] << endl;
-  cerr << "Theta ranges from "  << grid.origin[1] << " to " << grid.origin[4] << " with increment " << dx[1] << endl;
-  cerr << "Radius ranges from " << grid.origin[0] << " to " << grid.origin[3] << " with increment " << dx[0] << endl;
+  cerr << "Phi ranges from "    << grid.layout.origin[2] << " to " << grid.layout.origin[5] << " with increment " << dx[2] << endl;
+  cerr << "Theta ranges from "  << grid.layout.origin[1] << " to " << grid.layout.origin[4] << " with increment " << dx[1] << endl;
+  cerr << "Radius ranges from " << grid.layout.origin[0] << " to " << grid.layout.origin[3] << " with increment " << dx[0] << endl;
 
 */
   vtkCharArray *nameArray = vtkCharArray::New();
   nameArray->SetName("Name");
   char *name = nameArray->WritePointer(0, 20);
-  sprintf(name, "Grid %d", grid.grid_nr);
+  sprintf(name, "Grid %d", grid.layout.grid_nr);
 
   vtkStructuredGrid* sg = vtkStructuredGrid::New();
   sg->GetFieldData()->AddArray(nameArray);
@@ -1257,10 +1257,10 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
   sg->GetFieldData()->AddArray(data);
   data->Delete();
 
-  sg->SetDimensions(grid.dimensions[0],
-                    grid.dimensions[1],
-                    grid.dimensions[2]);
-  nvals = grid.dimensions[0] * grid.dimensions[1] * grid.dimensions[2];
+  sg->SetDimensions(grid.layout.dimensions[0],
+                    grid.layout.dimensions[1],
+                    grid.layout.dimensions[2]);
+  nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
 
   vtkDoubleArray *coords = vtkDoubleArray::New();
   coords->SetNumberOfComponents(3);
@@ -1286,22 +1286,22 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
 
   double alpha = pow((this->SphereLogRMappings[1].Rmax/this->SphereLogRMappings[1].Rmin), 1.0/NLevel_R) - 1;
   //cerr << "alpha " << alpha << endl;
-  for(Iphi=0; Iphi < grid.dimensions[2]; Iphi++)
+  for(Iphi=0; Iphi < grid.layout.dimensions[2]; Iphi++)
     {
-    double arg_phi = this->SphereLogRMappings[1].Pmin + (grid.box_corners[2] + Iphi)*Delta_Level_P;
-    for(Itheta=0; Itheta < grid.dimensions[1]; Itheta++)
+    double arg_phi = this->SphereLogRMappings[1].Pmin + (grid.layout.box_corners[2] + Iphi)*Delta_Level_P;
+    for(Itheta=0; Itheta < grid.layout.dimensions[1]; Itheta++)
       {
-      double arg_theta = this->SphereLogRMappings[1].Tmin + (grid.box_corners[1] + Itheta)*Delta_Level_T;
+      double arg_theta = this->SphereLogRMappings[1].Tmin + (grid.layout.box_corners[1] + Itheta)*Delta_Level_T;
 // so the fastest index is the radial index. 
 // cell 0 is at the lower right corner of the 2D map, and then the theta sweep goes from 0 to PI in counter-clockwise fashion
-      I = Iphi*(grid.dimensions[1]*grid.dimensions[0]) + Itheta*grid.dimensions[0];
-      for(Iradius=0; Iradius < grid.dimensions[0]; Iradius++)
+      I = Iphi*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Itheta*grid.layout.dimensions[0];
+      for(Iradius=0; Iradius < grid.layout.dimensions[0]; Iradius++)
         {
-         //if(Itheta==0) cerr << this->SphereLogRMappings[1].Rmin * pow(1.0 + alpha, grid.box_corners[0]+Iradius) << "\n";
-        double R = this->SphereLogRMappings[1].Rmin * pow(1.0 + alpha, grid.box_corners[0]+Iradius);
+         //if(Itheta==0) cerr << this->SphereLogRMappings[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius) << "\n";
+        double R = this->SphereLogRMappings[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius);
         R /= this->LengthScaleFactor;
         map_rtp2xyz(R, arg_theta, arg_phi, &x, &y, &z);
-        //coords->SetTuple3(I+Iradius, param[1].Rmin * pow(1.0 + alpha, grid.box_corners[0]+Iradius), arg_theta, arg_phi);
+        //coords->SetTuple3(I+Iradius, param[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius), arg_theta, arg_phi);
         coords->SetTuple3(I+Iradius, x, y, z);
         }//if(Itheta==0) cerr << endl;
       }
@@ -1483,14 +1483,14 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
   dx[1] = this->Levels[levelId].DXs[1];
   dx[2] = this->Levels[levelId].DXs[2];
 
-  //cerr << "Phi ranges from "    << grid.origin[2] << " to " << grid.origin[5] << " with increment " << dx[2] << endl;
-  //cerr << "Theta ranges from "  << grid.origin[1] << " to " << grid.origin[4] << " with increment " << dx[1] << endl;
-  //cerr << "Radius ranges from " << grid.origin[0] << " to " << grid.origin[3] << " with increment " << dx[0] << endl;
+  //cerr << "Phi ranges from "    << grid.layout.origin[2] << " to " << grid.layout.origin[5] << " with increment " << dx[2] << endl;
+  //cerr << "Theta ranges from "  << grid.layout.origin[1] << " to " << grid.layout.origin[4] << " with increment " << dx[1] << endl;
+  //cerr << "Radius ranges from " << grid.layout.origin[0] << " to " << grid.layout.origin[3] << " with increment " << dx[0] << endl;
 
   vtkCharArray *nameArray = vtkCharArray::New();
   nameArray->SetName("Name");
   char *name = nameArray->WritePointer(0, 20);
-  sprintf(name, "Grid %d", grid.grid_nr);
+  sprintf(name, "Grid %d", grid.layout.grid_nr);
 
   vtkStructuredGrid* sg = vtkStructuredGrid::New();
   sg->GetFieldData()->AddArray(nameArray);
@@ -1501,10 +1501,10 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
   sg->GetFieldData()->AddArray(data);
   data->Delete();
 
-  sg->SetDimensions(grid.dimensions[0],
-                    grid.dimensions[1],
-                    grid.dimensions[2]);
-  nvals = grid.dimensions[0] * grid.dimensions[1] * grid.dimensions[2];
+  sg->SetDimensions(grid.layout.dimensions[0],
+                    grid.layout.dimensions[1],
+                    grid.layout.dimensions[2]);
+  nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
 
   vtkDoubleArray *coords = vtkDoubleArray::New();
   coords->SetNumberOfComponents(3);
@@ -1523,37 +1523,37 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
 
   if(this->LengthScale)
     {
-    Ox = grid.origin[0]/this->LengthScaleFactor;
-    Oy = grid.origin[1]/this->LengthScaleFactor;
-    Oz = grid.origin[2]/this->LengthScaleFactor;
+    Ox = grid.layout.origin[0]/this->LengthScaleFactor;
+    Oy = grid.layout.origin[1]/this->LengthScaleFactor;
+    Oz = grid.layout.origin[2]/this->LengthScaleFactor;
     }
   else
     {
-    Ox = grid.origin[0];
-    Oy = grid.origin[1];
-    Oz = grid.origin[2];
+    Ox = grid.layout.origin[0];
+    Oy = grid.layout.origin[1];
+    Oz = grid.layout.origin[2];
     }
   double R = this->DCR_Mappings.Rmax;
   //R /= this->LengthScaleFactor;
   if(!strncmp(this->DCR_Mappings.MapCase, "CASE_A", 6))
     {
     cerr << "CASE_A"    << endl;
-    for(Iz=0; Iz < grid.dimensions[2]; Iz++)
+    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
     {
-    for(Iy=0; Iy < grid.dimensions[1]; Iy++)
+    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
       {
-      I = Iz*(grid.dimensions[1]*grid.dimensions[0]) + Iy*grid.dimensions[0];
-      for(Ix=0; Ix < grid.dimensions[0]; Ix++)
+      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
+      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
         {
         if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.dimensions[1]-1))*dx[1];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
+          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
           zc = 0;
           }
         else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
           yc = Oy + Iy*dx[1];
           zc = 0;
           }
@@ -1572,22 +1572,22 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
   if(!strncmp(this->DCR_Mappings.MapCase, "CASE_B", 6))
     {
     cerr << "CASE_B"    << endl;
-    for(Iz=0; Iz < grid.dimensions[2]; Iz++)
+    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
     {
-    for(Iy=0; Iy < grid.dimensions[1]; Iy++)
+    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
       {
-      I = Iz*(grid.dimensions[1]*grid.dimensions[0]) + Iy*grid.dimensions[0];
-      for(Ix=0; Ix < grid.dimensions[0]; Ix++)
+      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
+      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
         {
         if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.dimensions[1]-1))*dx[1];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
+          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
           zc = 0;
           }
         else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
           yc = Oy + Iy*dx[1];
           zc = 0;
           }
@@ -1606,22 +1606,22 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
   if(!strncmp(this->DCR_Mappings.MapCase, "CASE_C", 6))
     {
     cerr << "CASE_C"    << endl;
-    for(Iz=0; Iz < grid.dimensions[2]; Iz++)
+    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
     {
-    for(Iy=0; Iy < grid.dimensions[1]; Iy++)
+    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
       {
-      I = Iz*(grid.dimensions[1]*grid.dimensions[0]) + Iy*grid.dimensions[0];
-      for(Ix=0; Ix < grid.dimensions[0]; Ix++)
+      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
+      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
         {
         if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.dimensions[1]-1))*dx[1];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
+          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
           zc = 0;
           }
         else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
           yc = Oy + Iy*dx[1];
           zc = 0;
           }
@@ -1640,22 +1640,22 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
   else if(!strncmp(this->DCR_Mappings.MapCase, "CASE_D", 6))
     {
     cerr << "CASE_D"    << endl;
-    for(Iz=0; Iz < grid.dimensions[2]; Iz++)
+    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
     {
-    for(Iy=0; Iy < grid.dimensions[1]; Iy++)
+    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
       {
-      I = Iz*(grid.dimensions[1]*grid.dimensions[0]) + Iy*grid.dimensions[0];
-      for(Ix=0; Ix < grid.dimensions[0]; Ix++)
+      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
+      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
         {
         if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.dimensions[1]-1))*dx[1];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
+          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
           zc = 0;
           }
         else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
           {
-          xc = Ox + (2*Ix-(grid.dimensions[0]-1))*dx[0];
+          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
           yc = Oy + Iy*dx[1];
           zc = 0;
           }
@@ -1666,7 +1666,7 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
           zc = 0;
           }
         map_c2p_fig32d(xc, yc, zc, R, &x, &y, &z);
-        //coords->SetTuple3(I+Iradius, param[1].Rmin * pow(1.0 + alpha, grid.box_corners[0]+Iradius), arg_theta, arg_phi);
+        //coords->SetTuple3(I+Iradius, param[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius), arg_theta, arg_phi);
         coords->SetTuple3(I+Ix, x, y, z);
         }//if(Itheta==0) cerr << endl;
       }
@@ -1698,7 +1698,7 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
   vtkCharArray *nameArray = vtkCharArray::New();
   nameArray->SetName("Name");
   char *name = nameArray->WritePointer(0, 20);
-  sprintf(name, "Grid %d", grid.grid_nr);
+  sprintf(name, "Grid %d", grid.layout.grid_nr);
 
   rg->GetFieldData()->AddArray(nameArray);
   nameArray->Delete();
@@ -1716,8 +1716,8 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
   ycoords->SetNumberOfComponents(1);
   zcoords->SetNumberOfComponents(1);
 
-  xcoords->SetNumberOfTuples(grid.dimensions[0]);
-  ycoords->SetNumberOfTuples(grid.dimensions[1]);
+  xcoords->SetNumberOfTuples(grid.layout.dimensions[0]);
+  ycoords->SetNumberOfTuples(grid.layout.dimensions[1]);
 
   if(this->LengthScale)
     {
@@ -1727,25 +1727,25 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
     dx[2] = dx[2]/this->LengthScaleFactor;
     }
   //cerr << "RectGrid(dx0,dx1,dx2) "<< dx[0] << ", "<< dx[1] << "," << dx[2]<<"\n";
-  if(grid.dimensions[2] > 1)  // a 3D grid
+  if(grid.layout.dimensions[2] > 1)  // a 3D grid
     {
-    zcoords->SetNumberOfTuples(grid.dimensions[2]);
+    zcoords->SetNumberOfTuples(grid.layout.dimensions[2]);
     }
   else
     {
     zcoords->SetNumberOfTuples(1);
     }
 
-  //rg->SetWholeExtent(0, grid.dimensions[0]-1,
-                     //0, grid.dimensions[1]-1,
-                     //0, grid.dimensions[2]-1);
+  //rg->SetWholeExtent(0, grid.layout.dimensions[0]-1,
+                     //0, grid.layout.dimensions[1]-1,
+                     //0, grid.layout.dimensions[2]-1);
   double origin;
   if(this->LengthScale)
-    origin = grid.origin[0]/this->LengthScaleFactor;
+    origin = grid.layout.origin[0]/this->LengthScaleFactor;
   else
-    origin = grid.origin[0];
+    origin = grid.layout.origin[0];
 
-  for(i=0; i < grid.dimensions[0]; i++)
+  for(i=0; i < grid.layout.dimensions[0]; i++)
     {
     xcoords->SetValue(i, (origin + i*dx[0]) );
     }
@@ -1754,11 +1754,11 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
   xcoords->Delete();
 /////////////////////////////////////////
   if(this->LengthScale)
-    origin = grid.origin[1]/this->LengthScaleFactor;
+    origin = grid.layout.origin[1]/this->LengthScaleFactor;
   else
-    origin = grid.origin[1];
+    origin = grid.layout.origin[1];
 
-  for(i=0; i < grid.dimensions[1]; i++)
+  for(i=0; i < grid.layout.dimensions[1]; i++)
     {
     ycoords->SetValue(i, origin + i*dx[1] );
     }
@@ -1767,11 +1767,11 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
   ycoords->Delete();
 /////////////////////////////////////////
   if(this->LengthScale)
-    origin = grid.origin[2]/this->LengthScaleFactor;
+    origin = grid.layout.origin[2]/this->LengthScaleFactor;
   else
-    origin = grid.origin[2];
+    origin = grid.layout.origin[2];
 
-  for(i=0; i < grid.dimensions[2]; i++)
+  for(i=0; i < grid.layout.dimensions[2]; i++)
     {
     zcoords->SetValue(i, origin + i*dx[2] );
     }
@@ -1780,14 +1780,14 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
   zcoords->Delete();
 /////////////////////////////////////////
 
-  rg->SetDimensions(grid.dimensions[0],
-                    grid.dimensions[1],
-                    grid.dimensions[2]);
+  rg->SetDimensions(grid.layout.dimensions[0],
+                    grid.layout.dimensions[1],
+                    grid.layout.dimensions[2]);
 
 /*
-cerr << "RG: of size " << grid.dimensions[0] << "x"<<
-                    grid.dimensions[1]<< "x"<<
-                    grid.dimensions[2]<<endl;
+cerr << "RG: of size " << grid.layout.dimensions[0] << "x"<<
+                    grid.layout.dimensions[1]<< "x"<<
+                    grid.layout.dimensions[2]<<endl;
 */
 
   return rg;

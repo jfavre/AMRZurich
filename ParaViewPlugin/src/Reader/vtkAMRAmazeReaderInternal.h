@@ -177,7 +177,7 @@ public:
   vtkGetMacro(CellCentered, int);
   vtkBooleanMacro(CellCentered, int);
 
-  void  ReadMetaData();
+  int  ReadMetaData(); // returns nb of stars
 
   void FindLevelAndBlock(int domain, int &level, int &block) const;
   int GetBlockLevel(const int domain) const;
@@ -239,7 +239,7 @@ protected:
   int MaxLevelWrite;
 
   FILE *errs;
-  void ReadHDF5MetaData();
+  int ReadHDF5MetaData();
   void ReadHDF5VariablesMetaData();
 
 private:

@@ -121,6 +121,7 @@ protected:
   unsigned int MaximumLevelsToReadByDefault;
   vtkAMRAmazeReaderInternal *myreader;
   bool LoadedMetaData;
+  int nbstars;
   vtkDataArraySelection* PointDataArraySelection;
 
  private:

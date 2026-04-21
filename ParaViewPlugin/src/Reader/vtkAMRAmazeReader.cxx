@@ -43,6 +43,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
   this->FileName = nullptr;
   this->LoadedMetaData = false;
+  this->nbstars = 0;
   this->LogDataOn();
   this->DataScaleOn();
   this->ShiftedGridOff();
@@ -152,7 +153,7 @@ int vtkAMRAmazeReader::RequestInformation(
   //cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->FileName << "\n";
   this->myreader->SetFileName(this->FileName);
 
-  this->myreader->ReadMetaData();
+  this->nbstars = this->myreader->ReadMetaData();
 
   this->LevelRange[0] = 0;
   this->LevelRange[1] = this->myreader->NumberOfLevels-1;
@@ -245,7 +246,7 @@ int vtkAMRAmazeReader::RequestInformation(
 int vtkAMRAmazeReader::RequestData(
   vtkInformation*, vtkInformationVector**, vtkInformationVector* outputVector)
 {
-  int  n, nb_stars, record;
+  int  n, local_nb_stars, record;
 
   herr_t   status;
   hid_t    root_id, level_root_id, attr1;
@@ -309,7 +310,7 @@ int vtkAMRAmazeReader::RequestData(
   int i, levelId, g = 0;
 #ifdef PARALLEL_DEBUG
   std::ostringstream fname;
-  fname << "/tmp/out." << piece << ".txt" << ends;
+  fname << "/capstor/scratch/cscs/jfavre/Amaze/out." << piece << ".txt" << ends;
   std::ofstream errs;
   errs.open(fname.str().c_str(),ios::app);
   //delete [] fname.str();
@@ -477,20 +478,21 @@ int vtkAMRAmazeReader::RequestData(
     errs.close();
 #endif
 
-  if(piece == 0)// should only proc 0 read the stars?
+  info = outputVector->GetInformationObject(1);
+  vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
+  if(piece == 0) // only MPI task 0 reads the stars
     {
-    //cerr << "vtkAMRAmazeReader::RequestData() Load stars\n\n";
-
-      vtkInformation* info = outputVector->GetInformationObject(1);
-      vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
-      if (!output2)
-        {
-        cerr << "did not get a correct output2 object\n";
-        }
-      else
-        {
-        nb_stars = vtkAMRAmazeReader::LoadStars(root_id, output2);
-        }
+    local_nb_stars = vtkAMRAmazeReader::LoadStars(root_id, output2);
+    if(local_nb_stars != this->nbstars)
+      {
+      cerr << "something went wrong counting stars\n";
+      cerr << __LINE__ << "nb_stars = " << local_nb_stars << endl;
+      }
+    }
+  else
+    {
+    for(auto i=0; i < this->nbstars; i++)
+      output2->SetBlock(i, nullptr);
     }
 
   this->UpdateProgress(1.0);
@@ -502,11 +504,9 @@ int vtkAMRAmazeReader::RequestData(
 int vtkAMRAmazeReader::LoadStars(hid_t root_id,
                                 vtkMultiBlockDataSet* SpherSymStars)
 {
-  int i, nb_stars;
-
   this->myreader->BuildStars();
-  nb_stars = this->myreader->NumberOfSphericallySymmetricStars + this->myreader->NumberOfAxisSymmetricStars;
-  for(i=0; i < nb_stars; i++)
+  int nb_stars = this->myreader->NumberOfSphericallySymmetricStars + this->myreader->NumberOfAxisSymmetricStars;
+  for(auto i=0; i < nb_stars; i++)
     {
     SpherSymStars->SetBlock(i, this->myreader->Stars[i]);
 

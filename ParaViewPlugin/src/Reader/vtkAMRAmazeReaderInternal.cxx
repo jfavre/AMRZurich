@@ -510,7 +510,7 @@ void vtkAMRAmazeReaderInternal::SetFileName(const char* filename)
 
 
 //----------------------------------------------------------------------------
-void vtkAMRAmazeReaderInternal::ReadMetaData()
+int vtkAMRAmazeReaderInternal::ReadMetaData()
 {
   //FILE *fp=NULL;
   int levelId, GridId, i, node_veclen;
@@ -522,16 +522,16 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
     {
     //this->SetErrorCode(vtkErrorCode::NoFileNameError);
     //vtkErrorMacro(<< "Must specify adG file");
-    return;
+    return 0;
     }
   //cout << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   if(this->file_id<0)
     {
     cerr << "file could not be opened. Check filename " << endl;
-    return;
+    return 0;
     }
-  this->ReadHDF5MetaData();
+  auto nbstars = this->ReadHDF5MetaData();
   //cout << "done with ReadHDF5MetaData() " << endl;
 
   //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &this->Time, 1);
@@ -591,7 +591,7 @@ void vtkAMRAmazeReaderInternal::ReadMetaData()
   //grid = this->Grids;
   //int size = grid[0].dimensions[0];
 
-  return;
+  return nbstars;
 }
 
 /*
@@ -856,9 +856,9 @@ void vtkAMRAmazeReaderInternal::MakeVariableNames()
     }
 }
 
-void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
+int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
 {
-  hid_t   root_id;
+  hid_t   root_id, apr_root_id, StarsDS, models_root_id;
   hid_t   attr1;
   herr_t  status;
 // turn off error reporting
@@ -890,12 +890,9 @@ void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
   if (status < 0)
     {
     vtkGenericWarningMacro("Failed to open Time Attribute " << endl);
-    return;
+    return 0;
     }
-  //else
-    //cout << "vtkAMRAmazeReaderInternal::ReadHDF5MetaData read Time = " << this->AMAZETime << endl;
   status = H5Aclose(attr1);
-    //cerr << "AMR::RequestInformation for time " << this->AMAZETime << endl;
 
   attr1 = H5Aopen_name(root_id, "Time Scaling Factor");
   status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &AMAZETimeScalor);
@@ -959,7 +956,27 @@ void vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
     }
   
   H5Gclose(root_id);
+  
+  int nb_stars=0;
+
+  apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems", H5P_DEFAULT);
+  models_root_id = H5Gopen(apr_root_id, "Stars", H5P_DEFAULT);
+  hid_t dataspace;
+  hsize_t dims_out[1]; // we assume rank = 1
+
+  if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
+    {
+    dataspace = H5Dget_space(StarsDS);
+    status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+    nb_stars = dims_out[0];
+    H5Sclose(dataspace);
+    H5Gclose(StarsDS);
+    }
+
+  H5Gclose(models_root_id);
+  H5Gclose(apr_root_id);
   H5Eset_auto2(H5E_DEFAULT, func, client_data);
+  return nb_stars;
 }
 
 vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *varname)
@@ -2373,6 +2390,9 @@ for(int i=0; i < this->Stars.size(); i++)
 
   return nb_stars;
 }
+
+
+
 
 /*
 for(int i=0; i < this->Stars.size(); i++)

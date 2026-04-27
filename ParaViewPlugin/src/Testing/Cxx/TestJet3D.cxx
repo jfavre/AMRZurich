@@ -1,4 +1,4 @@
-#include <iostream>
+
 #include <vtkAutoInit.h>
 VTK_MODULE_INIT(vtkRenderingOpenGL2);
 VTK_MODULE_INIT(vtkInteractionStyle);
@@ -6,7 +6,6 @@ VTK_MODULE_INIT(vtkInteractionStyle);
 #include "vtkOverlappingAMR.h"
 #include "vtkCamera.h"
 #include "vtkClipDataSet.h"
-#include "vtkCompositeDataPipeline.h"
 #include "vtkCompositeDataSet.h"
 #include "vtkContourFilter.h"
 #include "vtkCutter.h"
@@ -28,9 +27,6 @@ VTK_MODULE_INIT(vtkInteractionStyle);
 #include "vtkTIFFWriter.h"
 #include "vtkTimerLog.h"
 #include "vtkWindowToImageFilter.h"
-#include "vtkTestUtilities.h"
-#include "vtkXMLHierarchicalBoxDataReader.h"
-#include "vtkXMLHierarchicalBoxDataWriter.h"
 
 #include <iostream>
 using namespace std;
@@ -38,14 +34,8 @@ using namespace std;
 #define VTK_CREATE(type, var) \
   vtkSmartPointer<type> var = vtkSmartPointer<type>::New();
 
-//#define ALL 1
-
 int main(int argc, char **argv)
 {
-  //vtkCompositeDataPipeline* prototype = vtkCompositeDataPipeline::New();
-  //vtkAlgorithm::SetDefaultExecutivePrototype(prototype);
-  //prototype->Delete();
-
   VTK_CREATE(vtkTimerLog, timer);
   timer->StartTimer();
 
@@ -71,7 +61,6 @@ int main(int argc, char **argv)
   //static_cast<vtkOverlappingAMR*>(reader->GetOutput())->Audit();
   //reader->GetOutput()->Print(cout);
 
-#ifdef ALL
   VTK_CREATE(vtkContourFilter, contour);
   contour->SetInputConnection(0, reader->GetOutputPort(0));
   contour->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Log10(Density) [N/cm^3]");
@@ -209,7 +198,6 @@ int main(int argc, char **argv)
     {
     cout<<"depth peeling was not used (alpha blending instead)"<<endl;
     }
-#endif
 
   return 0;
 }

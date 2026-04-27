@@ -1,37 +1,33 @@
 #include "vtkAMRAmazeReaderInternal.h"
 
 #include "vtkAMRBox.h"
-#include "vtkByteSwap.h"
-#include "vtkCharArray.h"
-#include "vtkStringArray.h"
-#include "vtkDataArray.h"
 #include "vtkCellArray.h"
+#include "vtkCharArray.h"
+//#include "vtkDataArray.h"
 #include "vtkDataSetAttributes.h"
-#include "vtkDataSetWriter.h"
 #include "vtkDoubleArray.h"
-#include "vtkSphereSource.h"
-#include "vtkFloatArray.h"
 #include "vtkErrorCode.h"
-
+#include "vtkFloatArray.h"
 #include "vtkMath.h"
-#include "vtkObjectFactory.h"
+//#include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkPoints.h"
 #include "vtkPolyData.h"
+#include "vtkRectilinearGrid.h"
+#include "vtkSphereSource.h"
+#include "vtkStringArray.h"
+#include "vtkStructuredGrid.h"
 #include "vtkTransform.h"
 #include "vtkTransformPolyDataFilter.h"
-#include "vtkStructuredGrid.h"
-#include "vtkRectilinearGrid.h"
 #include "vtkUniformGrid.h"
+
 #include <stdio.h>
 #include <math.h>
-
-#include "vtkTimerLog.h"
+#include <stddef.h>
 
 //#define SINGLE_OUTPUT_PORT 1
 //#define PARALLEL_DEBUG 1
-#include <stddef.h>
-//#include <cstddef>
+
 #include <vector>
 #include <string>
 #include <map>
@@ -977,7 +973,7 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
   H5Gclose(apr_root_id);
   H5Eset_auto2(H5E_DEFAULT, func, client_data);
   return nb_stars;
-}
+} // end of ReadHDF5MetaData()
 
 vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *varname)
 {
@@ -2099,17 +2095,6 @@ int vtkAMRAmazeReaderInternal::BuildStars()
       this->Stars.push_back(ss->GetOutput());
       //ss->Delete();
       }
-/*
-for(int i=0; i < this->Stars.size(); i++)
-  {
-  vtkDataSetWriter *writer = vtkDataSetWriter::New();
-  writer->SetInputData(this->Stars[i]);
-  cerr << "writing " << this->Stars[i]->GetNumberOfPoints() << " to disk\n";
-  writer->SetFileName(std::format("/tmp/foo.{:2d}.vtk", i).c_str());
-  writer->Write();
-  writer->Delete();
-  }
-*/
     } // end of old-style stars before november 6, 2008
 
   else if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
@@ -2390,20 +2375,3 @@ for(int i=0; i < this->Stars.size(); i++)
 
   return nb_stars;
 }
-
-
-
-
-/*
-for(int i=0; i < this->Stars.size(); i++)
-{
-vtkDataSetWriter *writer = vtkDataSetWriter::New();
-writer->SetInput(this->Stars[i]);
-char f[65];
-sprintf(f,"/tmp/tmp/foo.%02d.vtk", i);
-cerr << "writing " << this->Stars[i]->GetNumberOfPoints() << " to disk\n";
-writer->SetFileName((const char*)f);
-writer->Write();
-writer->Delete();
-} 
-*/

@@ -111,14 +111,9 @@ int vtkAMRAmazeReader::RequestInformation(
   vtkInformationVector* outputVector)
 {
   if (!this->Superclass::RequestInformation(request, inputVector, outputVector))
-    {
+  {
     return 0;
-    }
-
-  //if (this->LoadedMetaData)
-  //{
-    //return (1);
-  //}
+  }
 
   vtkInformation* info = outputVector->GetInformationObject(0);
   //info->Set(vtkStreamingDemandDrivenPipeline::MAXIMUM_NUMBER_OF_PIECES(), -1);
@@ -133,17 +128,16 @@ int vtkAMRAmazeReader::RequestInformation(
     output = vtkOverlappingAMR::New();
     //cout << __LINE__ << " : Got a New vtkOverlappingAMR* = " << output << std::endl;
   }
-  
-  //FILE *fp=NULL;
-  int levelId, GridId, i, node_veclen;
+
+  int levelId;
   double time, time_scalor;
 
   if ( this->FileName == NULL || this->FileName[0] == '\0'  )
-    {
+  {
     //this->SetErrorCode(vtkErrorCode::NoFileNameError);
     //vtkErrorMacro(<< "Must specify adG file");
     return 1;
-    }
+  }
   if(this->GetLengthScale())
     this->myreader->LengthScaleOn();
   else
@@ -168,26 +162,26 @@ int vtkAMRAmazeReader::RequestInformation(
   output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
   info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
   
-  for(i=0; i < this->GetNumberOfComponents(); i++)
-    {
+  for(auto i=0; i < this->GetNumberOfComponents(); i++)
+  {
     this->PointDataArraySelection->AddArray((const char *)this->myreader->Labels[i].label);
     int count = strcspn((const char *)this->myreader->Labels[i].unit, " "); // count how many characters in unit different than " "
     this->myreader->Labels[i].unit[count] = '\0';
-    if(count == 0)
-      {
+    //if(count == 0)
+    //{
       //cerr << "found PointDataArray " << this->myreader->Labels[i].label << "\n";
-      }
-    else
-      {
+    //}
+    //else
+    //{
       //cerr << "found PointDataArray " << this->myreader->Labels[i].label << " [" << this->myreader->Labels[i].unit << "]\n";
-      }
-    }
+    //}
+  }
   std::vector<unsigned int> blocksPerLevel;
   blocksPerLevel.reserve(this->GetNumberOfLevels());
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
-    {
+  {
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
-    }
+  }
   output->Initialize(blocksPerLevel);
   output->SetOrigin(this->myreader->Grids[0].layout.origin);
   if(this->myreader->GetDimensionality() == 2)
@@ -201,34 +195,36 @@ int vtkAMRAmazeReader::RequestInformation(
   double spacing[3];
   int globalBoxId = 0;
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
-    {
+  {
     this->myreader->GetSpacing(levelId, spacing);
     output->SetSpacing(levelId, spacing);
     //cout << __LINE__ << ": output->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
     // old output->SetNumberOfDataSets(levelId, this->GridsPerLevels[levelId]);
     if ( levelId >= this->myreader->MinLevelRead && levelId <= this->myreader->MaxLevelRead )
+    {
+      for (auto GridId=0; GridId < this->GridsPerLevels(levelId); GridId++)
       {
-      // old pre-6.0 output->SetNumberOfDataSets(levelId, this->GridsPerLevels(levelId));
-
-      for (GridId=0; GridId < this->GridsPerLevels(levelId); GridId++)
-        {
         output->SetAMRBox(levelId,
                            GridId,
                            this->myreader->Grids[globalBoxId].amrbox);
         //output->SetDataSet(levelId, GridId, 0);
         //cerr << "gid " << globalBoxId << " " << this->myreader->Grids[globalBoxId].amrbox.GetDimensionality() << endl;
         globalBoxId++;
-        }
       }
+    }
     else
-      {
+    {
       // what to do? output->SetNumberOfDataSets(levelId, 0);
       globalBoxId += this->GridsPerLevels(levelId);
       //cerr << "skip " << this->GridsPerLevels[levelId]  << " blocks\n";
-      }
     }
+  }
 
-  vtkDebugMacro(<< "Dimensionality: " << this->myreader->GetDimensionality() << "\nNumberOfComponents: " << this->GetNumberOfComponents() << "\nNumberOfLevels: " << this->GetNumberOfLevels() << "\nNumberOfGrids: " << this->GetNumberOfGrids());
+  vtkDebugMacro(<< "\nDimensionality: " << this->myreader->GetDimensionality()
+                << "\nNumberOfComponents: " << this->GetNumberOfComponents()
+                << "\nNumberOfLevels: " << this->GetNumberOfLevels()
+                << "\nNumberOfGrids: " << this->GetNumberOfGrids()
+                );
 
   output->GenerateParentChildInformation();
 
@@ -242,14 +238,11 @@ int vtkAMRAmazeReader::RequestInformation(
   return 1;
 } // end of ExecuteInformation
 
-
 int vtkAMRAmazeReader::RequestData(
   vtkInformation*, vtkInformationVector**, vtkInformationVector* outputVector)
 {
-  int  n, local_nb_stars, record;
+  int local_nb_stars;
 
-  herr_t   status;
-  hid_t    root_id, level_root_id, attr1;
   this->MinLevelRead = this->LevelRead[0];
   this->MaxLevelRead = this->LevelRead[1];
   //cerr << "read only beetween " << this->MinLevelRead << " and " << this->MaxLevelRead << endl;
@@ -263,10 +256,10 @@ int vtkAMRAmazeReader::RequestData(
   this->myreader->MakeVariableNames();
 
   if(this->ShiftedGrid == true)
-    {
-     this->myreader->ReadHDF5GridsMetaData(true);
-     cout << "switching ON the shifted grid info\n";
-    }
+  {
+    this->myreader->ReadHDF5GridsMetaData(true);
+    cout << "switching ON the shifted grid info\n";
+  }
 
   if(this->LengthScale == true)
     this->myreader->LengthScaleOn();
@@ -288,44 +281,58 @@ int vtkAMRAmazeReader::RequestData(
     //this->Internal->UpdateIndices = std::set<int>();
     int length = info->Length(vtkCompositeDataPipeline::UPDATE_COMPOSITE_INDICES());
     if (length > 0)
-      {
+    {
       cerr << "requested " << length << " block" <<endl;
       int* idx = info->Get(vtkCompositeDataPipeline::UPDATE_COMPOSITE_INDICES());
       for(int k=0; k < length; k++)
         cerr << k << ", " << endl;
       cerr << endl;
       //this->Internal->UpdateIndices = std::set<int>(idx, idx+length);
-      }
+    }
   }
 
-  //vtkTimerLog *timer0 = vtkTimerLog::New();
-  //timer0->StartTimer();
   int piece = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER());
   int numberOfPieces = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES());
 
-  //double localTime = this->GetTime();
   output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), this->myreader->AMAZETime);
 
   unsigned int numLevels = this->GetNumberOfLevels();
-  int i, levelId, g = 0;
+
 #ifdef PARALLEL_DEBUG
   std::ostringstream fname;
-  fname << "/capstor/scratch/cscs/jfavre/Amaze/out." << piece << ".txt" << ends;
+  fname << "/capstor/scratch/cscs/jfavre/Amaze/out." << piece << ".txt";
+
   std::ofstream errs;
-  errs.open(fname.str().c_str(),ios::app);
-  //delete [] fname.str();
+  errs.open(fname.str().c_str(), std::ios::app);
+
+// If opening the primary file fails, fall back to /dev/shm
+  if (!errs.is_open())
+  {
+    std::ostringstream altname;
+    altname << "/dev/shm/out." << piece << ".txt";
+    errs.clear(); // clear fail state before retrying
+    errs.open(altname.str().c_str(), std::ios::app);
+    if (!errs.is_open())
+    {
+      std::cerr << "Error: could not open either output file:\n"
+                << "  " << fname.str() << "\n"
+                << "  " << altname.str() << std::endl;
+    }
+  }
+
   errs << "piece " << piece << " out of " << numberOfPieces << endl;
   //errs << "time = " << localTime  << endl;
 #endif
 
   std::vector<unsigned int> blocksPerLevel;
   blocksPerLevel.reserve(this->GetNumberOfLevels());
-  for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
-    {
+  for (auto levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
+  {
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
-    }
+  }
   output->Initialize(blocksPerLevel);
   output->SetOrigin(this->myreader->Grids[0].layout.origin);
+  
   if(this->myreader->GetDimensionality() == 2)
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else
@@ -337,93 +344,92 @@ int vtkAMRAmazeReader::RequestData(
   // done, things that depend on the number of blocks being set
   // properly (such as GenerateVisibilityArrays() will fail)
   if(this->MaxLevelRead == 0)
-    { // most likely we did not use the Paraview GUI which forces a valid value
+  { // most likely we did not use the Paraview GUI which forces a valid value
     this->MaxLevelRead = numLevels;
-    }
+  }
 
   //output->SetNumberOfLevels(this->GetNumberOfLevels());
 
   int TotNumBoxes = 0;
   for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
-    {
+  {
     TotNumBoxes += this->GridsPerLevels(levelId);
 #ifdef PARALLEL_DEBUG
     errs << "Level " << levelId << ": " << this->GridsPerLevels(levelId) << " blocks => Tot = " <<   TotNumBoxes << endl;
 #endif
-    }
+  }
 
 // establish what levels are actually read
   int lastLevel = this->MaxLevelRead;
   if (lastLevel > this->GetNumberOfLevels())
-    {
+  {
     lastLevel = this->GetNumberOfLevels();
-    }
+  }
   int firstLevel = this->MinLevelRead;
   if (firstLevel < 0)
-    {
+  {
     firstLevel = 0;
-    }
+  }
   if (firstLevel > lastLevel)
-    {
+  {
     firstLevel = lastLevel;
-    }
+  }
 
 // we now recount, including only the levels to be read
   int endBoxId=0;
   TotNumBoxes = 0;
   for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
-    {
-     if (levelId <= lastLevel)
+  {
+    if (levelId <= lastLevel)
        endBoxId += this->GridsPerLevels(levelId);
     if((levelId >= firstLevel) && (levelId <= lastLevel))
-      {
+    {
       TotNumBoxes += this->GridsPerLevels(levelId);
 #ifdef PARALLEL_DEBUG
       errs <<  "NewLevel " << levelId << ": " << this->GridsPerLevels(levelId) << " blocks => Tot = " <<  TotNumBoxes << endl;
 #endif
-      }
     }
+  }
 #ifdef PARALLEL_DEBUG
-      errs << "firstLevel = " << firstLevel << ", lastLevel = " <<  lastLevel << endl;
+  errs << "firstLevel = " << firstLevel << ", lastLevel = " <<  lastLevel << endl;
 #endif
 
-  int c;
   std::vector<adG_grid> &grid = this->myreader->Grids;
   int globalBoxId = 0;
   double spacing[3];
 
 // setup following for all grids, even if not all procs participate to 
   for (int levelId=0; levelId< this->GetNumberOfLevels(); levelId++)
-    {
+  {
     if (levelId >= firstLevel && levelId <= lastLevel )
-      {
+    {
       this->myreader->GetSpacing(levelId, spacing);
       output->SetSpacing(levelId, spacing);
       for (int boxId=0; boxId < this->GridsPerLevels(levelId); boxId++, globalBoxId++)
-        {
+      {
         output->SetAMRBox(levelId, boxId, this->myreader->Grids[globalBoxId].amrbox);
-        }
       }
     }
+  }
   globalBoxId = 0;
   for (int levelId=0; levelId< this->GetNumberOfLevels(); levelId++)
-    {
+  {
     if (levelId >= firstLevel && levelId <= lastLevel )
-      {
+    {
 #ifdef PARALLEL_DEBUG
       errs << "Level = " << levelId << ", numBoxes = " <<  this->GridsPerLevels(levelId) << endl;
 #endif
 
       for (int boxId=0; boxId < this->GridsPerLevels(levelId); boxId++, globalBoxId++)
-        {
+      {
         if( ((endBoxId - globalBoxId) % numberOfPieces) != piece)
-          {
+        {
 	  output->SetDataSet(levelId, boxId, NULL);
 #ifdef PARALLEL_DEBUG
       errs << "  skiped BoxId = " << boxId << " (global id = " << globalBoxId << ")\n";
 #endif
           continue;
-          }
+        }
         vtkUniformGrid* ug = this->myreader->ReadUniformGrid(levelId, boxId);
         output->SetDataSet(levelId, boxId, ug);
         //cerr << "gid2 " << globalBoxId << " " << this->myreader->Grids[globalBoxId].grid_nr << endl;
@@ -431,87 +437,71 @@ int vtkAMRAmazeReader::RequestData(
 #ifdef PARALLEL_DEBUG
         errs << "  read BoxId = " << boxId << " (global id = " << globalBoxId << ")\n";
 #endif
-        for(c=0; c < this->GetNumberOfComponents(); c++)
-          {
+        for(auto c=0; c < this->GetNumberOfComponents(); c++)
+        {
           if(this->PointDataArraySelection->ArrayIsEnabled(this->GetPointArrayName(c)))
-            { // used to test this->PointDataArraySelection->GetArraySetting(c)
-            //vtkDoubleArray* scalars = this->myreader->ReadVar(levelId, boxId, this->myreader->Labels[c]);
-            vtkDoubleArray* scalars = this->myreader->ReadVisItVar(globalBoxId, (const char*)this->myreader->Labels[c].label);
+          {  // used to test this->PointDataArraySelection->GetArraySetting(c)
+             //vtkDoubleArray* scalars = this->myreader->ReadVar(levelId, boxId, this->myreader->Labels[c]);
+             vtkDoubleArray* scalars = this->myreader->ReadVisItVar(globalBoxId, (const char*)this->myreader->Labels[c].label);
 
-            ug->GetPointData()->AddArray(scalars);
-            if (!ug->GetPointData()->GetScalars())
-              {
-              ug->GetPointData()->SetScalars(scalars);
-              }
-            scalars->Delete();
-            } // variable was selected for reading
-          }  // end of reading of all components
+             ug->GetPointData()->AddArray(scalars);
+             if (!ug->GetPointData()->GetScalars())
+             {
+               ug->GetPointData()->SetScalars(scalars);
+             }
+             scalars->Delete();
+          } // variable was selected for reading
+        }  // end of reading of all components
 
-    this->UpdateProgress (0.85*double(globalBoxId)/double(endBoxId));
+        this->UpdateProgress (0.85*double(globalBoxId)/double(endBoxId));
       } // all grids at that particular level
-#define ALL 1
 
-      } // if this level is included between MinLevel and MaxLevel
+    } // if this level is included between MinLevel and MaxLevel
     else
-      {
+    {
       // what to do ? output->SetNumberOfDataSets(levelId, 0);
-
       globalBoxId += this->GridsPerLevels(levelId);
-      }
-    } //end of processing all levels
+    }
+  } //end of processing all levels
   //cerr << __LINE__ << "Entering GenerateParentChildInformation()\n";
   //output->GenerateParentChildInformation();
   vtkAMRUtilities::BlankCells(output);
 
-  //timer0->StopTimer();
-  //cerr << "time elapsed to read data arrays: " << timer0->GetElapsedTime() << endl;
-  //timer0->Delete();
-  
-  //vtkTimerLog *timer = vtkTimerLog::New();
-  //timer->StartTimer();
-
-  //timer->StopTimer();
-  //cerr << "time elapsed to generate visibility arrays: " << timer->GetElapsedTime() << endl;
-  //timer->Delete();
-
 #ifdef PARALLEL_DEBUG
-    errs.close();
+  errs.close();
 #endif
-
+  // the second output holds the Stars Polydata
   info = outputVector->GetInformationObject(1);
   vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
   if(piece == 0) // only MPI task 0 reads the stars
-    {
-    local_nb_stars = vtkAMRAmazeReader::LoadStars(root_id, output2);
+  {
+    local_nb_stars = vtkAMRAmazeReader::LoadStars(output2);
     if(local_nb_stars != this->nbstars)
-      {
+    {
       cerr << "something went wrong counting stars\n";
       cerr << __LINE__ << "nb_stars = " << local_nb_stars << endl;
-      }
     }
+  }
   else
-    {
+  {
     for(auto i=0; i < this->nbstars; i++)
       output2->SetBlock(i, nullptr);
-    }
+  }
 
   this->UpdateProgress(1.0);
   cout << "=================================================================\n";
   return 1;
 } // RequestData
 
-
-int vtkAMRAmazeReader::LoadStars(hid_t root_id,
-                                vtkMultiBlockDataSet* SpherSymStars)
+int vtkAMRAmazeReader::LoadStars(vtkMultiBlockDataSet* SpherSymStars)
 {
   this->myreader->BuildStars();
   int nb_stars = this->myreader->NumberOfSphericallySymmetricStars + this->myreader->NumberOfAxisSymmetricStars;
   for(auto i=0; i < nb_stars; i++)
-    {
+  {
     SpherSymStars->SetBlock(i, this->myreader->Stars[i]);
-
     SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->myreader->Stars[i]->GetFieldData()->GetArray(0)->GetName());
-    }
+  }
 
   return nb_stars;
 }
@@ -526,16 +516,16 @@ void vtkAMRAmazeReader::PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "NumberOfLevels: " << this->GetNumberOfLevels() << endl;
   os << indent << "PointData Available: " << this->GetNumberOfComponents() << endl;
   for(int c=0; c < this->GetNumberOfComponents(); c++)
-    {
+  {
     if(this->PointDataArraySelection->ArrayIsEnabled(this->GetPointArrayName(c)))
-      {
+    {
       os << indent << indent << "Read \"" << this->GetPointArrayName(c) << "\"\n";
-      }
+    }
     else
-      {
+    {
       os << indent << indent << "Skipped \"" << this->GetPointArrayName(c) << "\"\n";
-      }
-   }
+    }
+ }
   os << indent << "Output Ports: " << this->GetNumberOfOutputPorts() << endl;
 }
 
@@ -552,13 +542,13 @@ int vtkAMRAmazeReader::GetPointArrayStatus(const char* name)
 void vtkAMRAmazeReader::SetPointArrayStatus(const char* name, int status)
 {
   if(status)
-    {
+  {
     this->PointDataArraySelection->EnableArray(name);
-    }
+  }
   else
-    {
+  {
     this->PointDataArraySelection->DisableArray(name);
-    }
+  }
 }
 
 int vtkAMRAmazeReader::GetNumberOfPointArrays()
@@ -600,10 +590,8 @@ void vtkAMRAmazeReader::DisableAll()
 vtkMultiBlockDataSet* vtkAMRAmazeReader::GetStarsOutput()
 {
   if (this->GetNumberOfOutputPorts() < 3)
-    {
-    return NULL;
-    }
-
-  //return vtkPolyData::SafeDownCast(this->GetExecutive()->GetOutputData(1));
+  {
+    return nullptr;
+  }
   return vtkMultiBlockDataSet::SafeDownCast(this->GetExecutive()->GetOutputData(2));
 }

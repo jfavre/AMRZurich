@@ -38,6 +38,7 @@ int main(int argc, char **argv)
   
   vtkSmartPointer<vtkOverlappingAMR> amr;
   amr = vtkOverlappingAMR::SafeDownCast(reader->GetOutputDataObject(0));
+  std::cout << *amr << endl;
   if (!amr->CheckValidity())
   {
     std::cerr << "amr->CheckValidity() failure\n";

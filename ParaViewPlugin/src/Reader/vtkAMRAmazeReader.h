@@ -84,7 +84,7 @@ public:
   void Disable(const char* name);  
   void Enable(const char* name); 
   vtkMultiBlockDataSet* GetStarsOutput();
-  int LoadStars(hid_t root_id, vtkMultiBlockDataSet*);
+  int LoadStars(vtkMultiBlockDataSet*);
   int GridsPerLevels(int l){return myreader->Levels[l].GridsPerLevel;};
   vtkSetMacro(MaximumLevelsToReadByDefault, unsigned int);
   vtkGetMacro(MaximumLevelsToReadByDefault, unsigned int);

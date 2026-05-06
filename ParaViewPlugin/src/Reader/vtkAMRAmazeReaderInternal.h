@@ -131,9 +131,6 @@ public:
   virtual void SetFileName(VTK_FILEPATH const char* filename);
   vtkGetFilePathMacro(FileName);
   
-  vtkSetStringMacro(HDF5SaveFileName);
-  vtkGetStringMacro(HDF5SaveFileName);
-
   // Description:
   // Get the number of components (similar to NumberOfComponents
   // in data arrays)
@@ -188,7 +185,6 @@ public:
   vtkStructuredGrid* ReadStructuredGrid(int domain);  // for Sphere_LogR
   vtkStructuredGrid* ReadStructuredGrid2(int domain); // for DCR_Cart2Spheres
   vtkDoubleArray* ReadVisItVar(int domain, const char *varname);
-  vtkDoubleArray* ReadVar(int levelId, int block, adG_component&);
   void CheckVarSize(int levelId, int block, adG_component &variable);
 
   int BuildStars();
@@ -229,7 +225,6 @@ protected:
   hid_t file_id;
   //std::string FileName;
   char* FileName = nullptr;
-  char* HDF5SaveFileName;
   int LogData; // will automatically calculate log10() for Density, Temperature and Pressure
   int Dimensionality;
   int DataScale;
@@ -241,6 +236,7 @@ protected:
   FILE *errs;
   int ReadHDF5MetaData();
   void ReadHDF5VariablesMetaData();
+  vtkDoubleArray* ReadVar(int levelId, int block, adG_component&);
 
 private:
 };

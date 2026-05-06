@@ -30,15 +30,13 @@ public:
   // Get/Set the name of the input file.
   vtkSetStringMacro(FileName);
   vtkGetStringMacro(FileName);
-  vtkSetStringMacro(HDF5SaveFileName);
-  vtkGetStringMacro(HDF5SaveFileName);
 
-  int GetNumberOfComponents(){return myreader->NumberOfComponents;};
-  int GetNumberOfLevels(){return myreader->NumberOfLevels;};
-  int GetNumberOfGrids(){return myreader->NumberOfGrids;};
+  int GetNumberOfComponents(){return Internal->NumberOfComponents;};
+  int GetNumberOfLevels(){return Internal->NumberOfLevels;};
+  int GetNumberOfGrids(){return Internal->NumberOfGrids;};
 
-  double GetTime(){return myreader->GetAMAZETime();};
-  void SetTime(double T) {myreader->SetAMAZETime(T);};
+  double GetTime(){return Internal->GetAMAZETime();};
+  void SetTime(double T) {Internal->SetAMAZETime(T);};
 
   vtkSetMacro(MaxLevelWrite, int);
   vtkGetMacro(MaxLevelWrite, int);
@@ -51,27 +49,27 @@ public:
   vtkSetVector2Macro(LevelRead, int);
   vtkGetVector2Macro(LevelRead, int);	
 
-  vtkSetMacro(ShiftedGrid, int);
-  vtkGetMacro(ShiftedGrid, int);
-  vtkBooleanMacro(ShiftedGrid, int);
+  vtkSetMacro(ShiftedGrid, vtkTypeBool);
+  vtkGetMacro(ShiftedGrid, vtkTypeBool);
+  vtkBooleanMacro(ShiftedGrid, vtkTypeBool);
 
-  vtkSetMacro(LogData, int);
-  vtkGetMacro(LogData, int);
-  vtkBooleanMacro(LogData, int);
+  vtkSetMacro(LogData, vtkTypeBool);
+  vtkGetMacro(LogData, vtkTypeBool);
+  vtkBooleanMacro(LogData, vtkTypeBool);
 
   vtkSetMacro(ScaleChoice, int);
   vtkGetMacro(ScaleChoice, int);
 
-  vtkSetMacro(LengthScale, int);
-  vtkGetMacro(LengthScale, int);
-  vtkBooleanMacro(LengthScale, int);
+  vtkSetMacro(LengthScale, vtkTypeBool);
+  vtkGetMacro(LengthScale, vtkTypeBool);
+  vtkBooleanMacro(LengthScale, vtkTypeBool);
 
   vtkSetMacro(LengthScaleFactor, double);
   vtkGetMacro(LengthScaleFactor, double);
 
-  vtkSetMacro(DataScale, int);
-  vtkGetMacro(DataScale, int);
-  vtkBooleanMacro(DataScale, int)
+  vtkSetMacro(DataScale, vtkTypeBool);
+  vtkGetMacro(DataScale, vtkTypeBool);
+  vtkBooleanMacro(DataScale, vtkTypeBool)
 
   vtkGetObjectMacro(PointDataArraySelection, vtkDataArraySelection);
 
@@ -79,13 +77,14 @@ public:
   const char* GetPointArrayName(int index);
   int GetPointArrayStatus(const char* name);
   void SetPointArrayStatus(const char* name, int status);
+
   void DisableAll();  
   void EnableAll();
   void Disable(const char* name);  
   void Enable(const char* name); 
   vtkMultiBlockDataSet* GetStarsOutput();
   int LoadStars(vtkMultiBlockDataSet*);
-  int GridsPerLevels(int l){return myreader->Levels[l].GridsPerLevel;};
+  int GridsPerLevels(int l){return Internal->Levels[l].GridsPerLevel;};
   vtkSetMacro(MaximumLevelsToReadByDefault, unsigned int);
   vtkGetMacro(MaximumLevelsToReadByDefault, unsigned int);
   vtkTypeBool CanReadFile(VTK_FILEPATH const char* fname);
@@ -105,22 +104,21 @@ protected:
   virtual int FillOutputPortInformation(int port, vtkInformation* info);
 
   // The input file's name.
-  hid_t file_id;
   char* FileName;
-  char* HDF5SaveFileName;
-  int LogData; // will automatically calculate log10() for Density, Temperature and Pressure
-  int LengthScale; // will automatically scale the grids to real length
-  int ShiftedGrid; //will use the shifter grid to provide stationary slab animation
+
+  vtkTypeBool LogData; // will automatically calculate log10() for Density, Temperature and Pressure
+  vtkTypeBool LengthScale; // will automatically scale the grids to real length
+  vtkTypeBool ShiftedGrid; //will use the shifter grid to provide stationary slab animation
   int ScaleChoice;
-  int DataScale;
+  vtkTypeBool DataScale;
   double LengthScaleFactor;
 
   int MaxLevelWrite;
   int MaxLevelRead;
   int MinLevelRead;
   unsigned int MaximumLevelsToReadByDefault;
-  vtkAMRAmazeReaderInternal *myreader;
-  bool LoadedMetaData;
+  vtkAMRAmazeReaderInternal *Internal;
+
   int nbstars;
   vtkDataArraySelection* PointDataArraySelection;
 

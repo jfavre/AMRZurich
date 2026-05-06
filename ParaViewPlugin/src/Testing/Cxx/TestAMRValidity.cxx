@@ -5,19 +5,15 @@
 #include "vtkAMRAmazeReader.h"
 #include "vtkOverlappingAMR.h"
 
-#include "vtkSmartPointer.h"
+#include "vtkNew.h"
 
 #include "vtkXMLUniformGridAMRWriter.h"
 
 #include <iostream>
-using namespace std;
-
-#define VTK_CREATE(type, var) \
-  vtkSmartPointer<type> var = vtkSmartPointer<type>::New();
 
 int main(int argc, char **argv)
 {
-  VTK_CREATE(vtkAMRAmazeReader, reader);
+  vtkNew<vtkAMRAmazeReader> reader;
   if(argc < 2)
     {
     std::cerr << "missing a filename argument: Syntax ./bin/TestAMRValidity <path-to>/file.amr5 [optional output.vtkhb]\n";
@@ -39,18 +35,19 @@ int main(int argc, char **argv)
   vtkSmartPointer<vtkOverlappingAMR> amr;
   amr = vtkOverlappingAMR::SafeDownCast(reader->GetOutputDataObject(0));
   std::cout << *amr << endl;
-  if (!amr->CheckValidity())
-  {
-    std::cerr << "amr->CheckValidity() failure\n";
-    return -1;
-  }
-  else if(argc == 3)
+
+  if(argc == 3)
   {
   vtkNew<vtkXMLUniformGridAMRWriter> writer;
   writer->SetFileName(argv[2]);
   writer->SetInputData(amr);
   writer->Write();
   }
-
-  return 0;
+  if (!amr->CheckValidity())
+  {
+    std::cerr << "amr->CheckValidity() failure\n";
+    return -1;
+  }
+  else
+    return 0;
 }

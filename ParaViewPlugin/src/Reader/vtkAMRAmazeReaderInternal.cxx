@@ -3,13 +3,14 @@
 #include "vtkAMRBox.h"
 #include "vtkCellArray.h"
 #include "vtkCharArray.h"
-//#include "vtkDataArray.h"
+
 #include "vtkDataSetAttributes.h"
 #include "vtkDoubleArray.h"
 #include "vtkErrorCode.h"
 #include "vtkFloatArray.h"
 #include "vtkMath.h"
-//#include "vtkObjectFactory.h"
+#include "vtkNew.h"
+
 #include "vtkPointData.h"
 #include "vtkPoints.h"
 #include "vtkPolyData.h"
@@ -410,11 +411,13 @@ vtkPolyData * vtkAMRAmazeReaderInternal::AxisSymStarSource(newstar *astar,
     }
   Temperature->Delete();
 
-  vtkDoubleArray *mass = vtkDoubleArray::New();
+  //vtkDoubleArray *mass = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> mass;
   mass->SetNumberOfComponents(1);
   mass->SetNumberOfTuples(1);
   mass->SetName("Mass");
-  vtkDoubleArray *velo = vtkDoubleArray::New();
+  //vtkDoubleArray *velo = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> velo;
   velo->SetNumberOfComponents(3);
   velo->SetNumberOfTuples(1);
   velo->SetName("Velocity");
@@ -424,8 +427,8 @@ vtkPolyData * vtkAMRAmazeReaderInternal::AxisSymStarSource(newstar *astar,
 
   mass->SetValue(0, astar->Mass);
   velo->SetTypedTuple(0, astar->Velocity);
-  velo->Delete();
-  mass->Delete();
+  //velo->Delete();
+  //mass->Delete();
 
   return AxiSymStar;
 }
@@ -998,7 +1001,7 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *
 
 vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_component &variable)
 {
-  hid_t level_root_id, grid_root_id, dataset_id, status, mem_space_id;
+  hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
   /*cerr << "domain = " << domain 
        << ", level = " << levelId 
@@ -1095,14 +1098,13 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
     {
     H5Fclose(this->file_id);
     this->file_id = 0;
-    //cerr << "920: H5Fclose( " << this->FileName << ")\n";
     }
   return scalars;
 }
 
 void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_component &variable)
 {
-  hid_t level_root_id, grid_root_id, dataset_id, status, mem_space_id;
+  hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
   /*cerr << "domain = " << domain 
        << ", level = " << levelId 
@@ -1183,17 +1185,7 @@ vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int bloc
   ug->Initialize();
   ug->GetFieldData()->AddArray(sarr);
   sarr->Delete();
-  /*
-  vtkDoubleArray *data = vtkDoubleArray::New();
-  data->SetName("Time");
-  data->InsertValue(0, this->Time);
-  ug->GetFieldData()->AddArray(data);
-  data->Delete();
-  */
-/*
-  if(this->LengthScale)
-    cerr << "LengthScaleFactor = " << this->LengthScaleFactor<<"\n";
-*/
+
   if(grid.layout.dimensions[2] > 1)  // a 3D grid
     {
     if(this->LengthScale)
@@ -1264,18 +1256,20 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
   vtkStructuredGrid* sg = vtkStructuredGrid::New();
   sg->GetFieldData()->AddArray(nameArray);
   nameArray->Delete();
-  vtkDoubleArray *data = vtkDoubleArray::New();
+  //vtkDoubleArray *data = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> data;
   data->SetName("Time");
   data->InsertValue(0, this->AMAZETime);
   sg->GetFieldData()->AddArray(data);
-  data->Delete();
+  //data->Delete();
 
   sg->SetDimensions(grid.layout.dimensions[0],
                     grid.layout.dimensions[1],
                     grid.layout.dimensions[2]);
   nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
 
-  vtkDoubleArray *coords = vtkDoubleArray::New();
+  //vtkDoubleArray *coords = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> coords;
   coords->SetNumberOfComponents(3);
   coords->SetNumberOfTuples(nvals);
 
@@ -1322,7 +1316,7 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
 
   vtkPoints *points = vtkPoints::New();
   points->SetData(coords);
-  coords->Delete();
+  //coords->Delete();
   sg->SetPoints(points);
   points->Delete();
 
@@ -1508,18 +1502,20 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
   vtkStructuredGrid* sg = vtkStructuredGrid::New();
   sg->GetFieldData()->AddArray(nameArray);
   nameArray->Delete();
-  vtkDoubleArray *data = vtkDoubleArray::New();
+  //vtkDoubleArray *data = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> data;
   data->SetName("Time");
   data->InsertValue(0, this->AMAZETime);
   sg->GetFieldData()->AddArray(data);
-  data->Delete();
+  //data->Delete();
 
   sg->SetDimensions(grid.layout.dimensions[0],
                     grid.layout.dimensions[1],
                     grid.layout.dimensions[2]);
   nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
 
-  vtkDoubleArray *coords = vtkDoubleArray::New();
+  //vtkDoubleArray *coords = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> coords;
   coords->SetNumberOfComponents(3);
   coords->SetNumberOfTuples(nvals);
 
@@ -1686,11 +1682,12 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
     }
     }
 
-  vtkPoints *points = vtkPoints::New();
+  //vtkPoints *points = vtkPoints::New();
+  vtkNew<vtkPoints> points;
   points->SetData(coords);
-  coords->Delete();
+  //coords->Delete();
   sg->SetPoints(points);
-  points->Delete();
+  //points->Delete();
 
   return sg;
 } // ReadStructuredGrid2
@@ -1707,23 +1704,13 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
   dx[1] = this->Levels[levelId].DXs[1];
   dx[2] = this->Levels[levelId].DXs[2];
   vtkRectilinearGrid* rg = vtkRectilinearGrid::New();
-/*
-  vtkCharArray *nameArray = vtkCharArray::New();
-  nameArray->SetName("Name");
-  char *name = nameArray->WritePointer(0, 20);
-  sprintf(name, "Grid %d", grid.layout.grid_nr);
 
-  rg->GetFieldData()->AddArray(nameArray);
-  nameArray->Delete();
-  vtkDoubleArray *data = vtkDoubleArray::New();
-  data->SetName("Time");
-  data->InsertValue(0, this->AMAZETime);
-  rg->GetFieldData()->AddArray(data);
-  data->Delete();
-*/
-  vtkDoubleArray *xcoords = vtkDoubleArray::New();
-  vtkDoubleArray *ycoords = vtkDoubleArray::New();
-  vtkDoubleArray *zcoords = vtkDoubleArray::New();
+  //vtkDoubleArray *xcoords = vtkDoubleArray::New();
+  //vtkDoubleArray *ycoords = vtkDoubleArray::New();
+  //vtkDoubleArray *zcoords = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> xcoords;
+  vtkNew<vtkDoubleArray> ycoords;
+  vtkNew<vtkDoubleArray> zcoords;
 
   xcoords->SetNumberOfComponents(1);
   ycoords->SetNumberOfComponents(1);
@@ -1764,7 +1751,7 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
     }
   //cerr << "Grid(x0,x1, y0,y1,z0,z1) "<< domain << ": "<<origin << "," << (origin + (i-1)*dx[0])<<", ";
   rg->SetXCoordinates(xcoords);
-  xcoords->Delete();
+  //xcoords->Delete();
 /////////////////////////////////////////
   if(this->LengthScale)
     origin = grid.layout.origin[1]/this->LengthScaleFactor;
@@ -1777,7 +1764,7 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
     }
   //cerr << origin << "," << origin + (i-1)*dx[1]<<", ";
   rg->SetYCoordinates(ycoords);
-  ycoords->Delete();
+  //ycoords->Delete();
 /////////////////////////////////////////
   if(this->LengthScale)
     origin = grid.layout.origin[2]/this->LengthScaleFactor;
@@ -1790,7 +1777,7 @@ vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
     }
   //cerr << origin << "," << origin + (i-1)*dx[2]<<"\n";
   rg->SetZCoordinates(zcoords);
-  zcoords->Delete();
+  //zcoords->Delete();
 /////////////////////////////////////////
 
   rg->SetDimensions(grid.layout.dimensions[0],
@@ -2018,19 +2005,23 @@ int vtkAMRAmazeReaderInternal::BuildStars()
 
     for (i=0; i < nb_stars; i++)
       {
-      vtkDoubleArray *velo = vtkDoubleArray::New();
+      //vtkDoubleArray *velo = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> velo;
       velo->SetNumberOfComponents(3);
       velo->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
       velo->SetName("Velocity");
-      vtkDoubleArray *mass = vtkDoubleArray::New();
+      //vtkDoubleArray *mass = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> mass;
       mass->SetNumberOfComponents(1);
       mass->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
       mass->SetName("Mass");
-      vtkDoubleArray *temp = vtkDoubleArray::New();
+      //vtkDoubleArray *temp = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> temp;
       temp->SetNumberOfComponents(1);
       temp->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
       temp->SetName((const char*)PVlabels["Temperature"].c_str());
-      vtkDoubleArray *lum = vtkDoubleArray::New();
+      //vtkDoubleArray *lum = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> lum;
       lum->SetNumberOfComponents(1);
       lum->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
       lum->SetName("Luminosity");
@@ -2091,7 +2082,11 @@ int vtkAMRAmazeReaderInternal::BuildStars()
       ss->GetOutput()->GetPointData()->AddArray(mass);
       ss->GetOutput()->GetPointData()->AddArray(temp);
       ss->GetOutput()->GetPointData()->AddArray(lum);
-      name->Delete(); velo->Delete();mass->Delete();temp->Delete();lum->Delete();
+      name->Delete();
+      //velo->Delete();
+      //mass->Delete();
+      //temp->Delete();
+      //lum->Delete();
       this->Stars.push_back(ss->GetOutput());
       //ss->Delete();
       }
@@ -2185,11 +2180,11 @@ int vtkAMRAmazeReaderInternal::BuildStars()
           cerr << "Error opening " << starname << endl;
           }
 
-        vtkDoubleArray *velo = vtkDoubleArray::New();
+        vtkNew<vtkDoubleArray> velo;
         velo->SetNumberOfComponents(3);
         velo->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
         velo->SetName("Velocity");
-        vtkDoubleArray *mass = vtkDoubleArray::New();
+        vtkNew<vtkDoubleArray> mass;
         mass->SetNumberOfComponents(1);
         mass->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
         mass->SetName("Mass");
@@ -2235,8 +2230,6 @@ int vtkAMRAmazeReaderInternal::BuildStars()
         ss->GetOutput()->GetPointData()->AddArray(velo);
         ss->GetOutput()->GetPointData()->AddArray(mass);
         name->Delete();
-        mass->Delete();
-        velo->Delete();
         this->Stars.push_back(ss->GetOutput());
         //ss->Delete();
         }

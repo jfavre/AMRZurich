@@ -42,7 +42,6 @@ vtkStandardNewMacro(vtkAMRAmazeReader);
 vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
   this->FileName = nullptr;
-  this->LoadedMetaData = false;
   this->nbstars = 0;
   this->LogDataOn();
   this->DataScaleOn();
@@ -65,7 +64,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
   this->GetExecutive()->SetOutputData(1, pd);
   pd->Delete();
 // this is for port number 1 which we do in all cases.
-  this->myreader = vtkAMRAmazeReaderInternal::New();
+  this->Internal = vtkAMRAmazeReaderInternal::New();
 }
 
 vtkAMRAmazeReader::~vtkAMRAmazeReader()
@@ -77,7 +76,7 @@ vtkAMRAmazeReader::~vtkAMRAmazeReader()
     }
 
   this->PointDataArraySelection->Delete();
-  this->myreader->Delete();
+  this->Internal->Delete();
 }
 
 vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname )
@@ -139,18 +138,18 @@ int vtkAMRAmazeReader::RequestInformation(
     return 1;
   }
   if(this->GetLengthScale())
-    this->myreader->LengthScaleOn();
+    this->Internal->LengthScaleOn();
   else
-    this->myreader->LengthScaleOff();
+    this->Internal->LengthScaleOff();
 
-  this->myreader->ScaleChoice = (ScaleOption)this->ScaleChoice;
+  this->Internal->ScaleChoice = (ScaleOption)this->ScaleChoice;
   //cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->FileName << "\n";
-  this->myreader->SetFileName(this->FileName);
+  this->Internal->SetFileName(this->FileName);
 
-  this->nbstars = this->myreader->ReadMetaData();
+  this->nbstars = this->Internal->ReadMetaData();
 
   this->LevelRange[0] = 0;
-  this->LevelRange[1] = this->myreader->NumberOfLevels-1;
+  this->LevelRange[1] = this->Internal->NumberOfLevels-1;
 
   double localTime = this->GetTime();
   double timeRange[2] = {localTime, localTime};
@@ -164,16 +163,16 @@ int vtkAMRAmazeReader::RequestInformation(
   
   for(auto i=0; i < this->GetNumberOfComponents(); i++)
   {
-    this->PointDataArraySelection->AddArray((const char *)this->myreader->Labels[i].label);
-    int count = strcspn((const char *)this->myreader->Labels[i].unit, " "); // count how many characters in unit different than " "
-    this->myreader->Labels[i].unit[count] = '\0';
+    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
+    int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
+    this->Internal->Labels[i].unit[count] = '\0';
     //if(count == 0)
     //{
-      //cerr << "found PointDataArray " << this->myreader->Labels[i].label << "\n";
+      //cerr << "found PointDataArray " << this->Internal->Labels[i].label << "\n";
     //}
     //else
     //{
-      //cerr << "found PointDataArray " << this->myreader->Labels[i].label << " [" << this->myreader->Labels[i].unit << "]\n";
+      //cerr << "found PointDataArray " << this->Internal->Labels[i].label << " [" << this->Internal->Labels[i].unit << "]\n";
     //}
   }
   std::vector<unsigned int> blocksPerLevel;
@@ -183,32 +182,32 @@ int vtkAMRAmazeReader::RequestInformation(
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
   }
   output->Initialize(blocksPerLevel);
-  output->SetOrigin(this->myreader->Grids[0].layout.origin);
-  if(this->myreader->GetDimensionality() == 2)
+  output->SetOrigin(this->Internal->Grids[0].layout.origin);
+  if(this->Internal->GetDimensionality() == 2)
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XYZ_GRID);
 
   int current_level = -1;
-  std::vector<adG_grid> &grid = this->myreader->Grids;
+  std::vector<adG_grid> &grid = this->Internal->Grids;
 
   double spacing[3];
   int globalBoxId = 0;
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
   {
-    this->myreader->GetSpacing(levelId, spacing);
+    this->Internal->GetSpacing(levelId, spacing);
     output->SetSpacing(levelId, spacing);
     //cout << __LINE__ << ": output->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
     // old output->SetNumberOfDataSets(levelId, this->GridsPerLevels[levelId]);
-    if ( levelId >= this->myreader->MinLevelRead && levelId <= this->myreader->MaxLevelRead )
+    if ( levelId >= this->Internal->MinLevelRead && levelId <= this->Internal->MaxLevelRead )
     {
       for (auto GridId=0; GridId < this->GridsPerLevels(levelId); GridId++)
       {
         output->SetAMRBox(levelId,
                            GridId,
-                           this->myreader->Grids[globalBoxId].amrbox);
+                           this->Internal->Grids[globalBoxId].amrbox);
         //output->SetDataSet(levelId, GridId, 0);
-        //cerr << "gid " << globalBoxId << " " << this->myreader->Grids[globalBoxId].amrbox.GetDimensionality() << endl;
+        //cerr << "gid " << globalBoxId << " " << this->Internal->Grids[globalBoxId].amrbox.GetDimensionality() << endl;
         globalBoxId++;
       }
     }
@@ -220,7 +219,7 @@ int vtkAMRAmazeReader::RequestInformation(
     }
   }
 
-  vtkDebugMacro(<< "\nDimensionality: " << this->myreader->GetDimensionality()
+  vtkDebugMacro(<< "\nDimensionality: " << this->Internal->GetDimensionality()
                 << "\nNumberOfComponents: " << this->GetNumberOfComponents()
                 << "\nNumberOfLevels: " << this->GetNumberOfLevels()
                 << "\nNumberOfGrids: " << this->GetNumberOfGrids()
@@ -233,8 +232,6 @@ int vtkAMRAmazeReader::RequestInformation(
   else
     outputVector->GetInformationObject(0)->Remove(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA());
 
-  //output->GetAMRInfo()->Print(cerr);
-  this->LoadedMetaData = true;
   return 1;
 } // end of ExecuteInformation
 
@@ -248,23 +245,23 @@ int vtkAMRAmazeReader::RequestData(
   //cerr << "read only beetween " << this->MinLevelRead << " and " << this->MaxLevelRead << endl;
 
   this->UpdateProgress(0.0);
-  if(this->LogData == true)
-    this->myreader->LogDataOn();
+  if(this->LogData)
+    this->Internal->LogDataOn();
   else
-    this->myreader->LogDataOff();
+    this->Internal->LogDataOff();
 
-  this->myreader->MakeVariableNames();
+  this->Internal->MakeVariableNames();
 
-  if(this->ShiftedGrid == true)
+  if(this->ShiftedGrid)
   {
-    this->myreader->ReadHDF5GridsMetaData(true);
+    this->Internal->ReadHDF5GridsMetaData(true);
     cout << "switching ON the shifted grid info\n";
   }
 
-  if(this->LengthScale == true)
-    this->myreader->LengthScaleOn();
+  if(this->LengthScale)
+    this->Internal->LengthScaleOn();
   else
-    this->myreader->LengthScaleOff();
+    this->Internal->LengthScaleOff();
 
   vtkInformation* info = outputVector->GetInformationObject(0);
   
@@ -294,7 +291,7 @@ int vtkAMRAmazeReader::RequestData(
   int piece = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER());
   int numberOfPieces = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES());
 
-  output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), this->myreader->AMAZETime);
+  output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), this->Internal->AMAZETime);
 
   unsigned int numLevels = this->GetNumberOfLevels();
 
@@ -331,9 +328,9 @@ int vtkAMRAmazeReader::RequestData(
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
   }
   output->Initialize(blocksPerLevel);
-  output->SetOrigin(this->myreader->Grids[0].layout.origin);
+  output->SetOrigin(this->Internal->Grids[0].layout.origin);
   
-  if(this->myreader->GetDimensionality() == 2)
+  if(this->Internal->GetDimensionality() == 2)
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
   else
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XYZ_GRID);
@@ -394,7 +391,7 @@ int vtkAMRAmazeReader::RequestData(
   errs << "firstLevel = " << firstLevel << ", lastLevel = " <<  lastLevel << endl;
 #endif
 
-  std::vector<adG_grid> &grid = this->myreader->Grids;
+  std::vector<adG_grid> &grid = this->Internal->Grids;
   int globalBoxId = 0;
   double spacing[3];
 
@@ -403,11 +400,11 @@ int vtkAMRAmazeReader::RequestData(
   {
     if (levelId >= firstLevel && levelId <= lastLevel )
     {
-      this->myreader->GetSpacing(levelId, spacing);
+      this->Internal->GetSpacing(levelId, spacing);
       output->SetSpacing(levelId, spacing);
       for (int boxId=0; boxId < this->GridsPerLevels(levelId); boxId++, globalBoxId++)
       {
-        output->SetAMRBox(levelId, boxId, this->myreader->Grids[globalBoxId].amrbox);
+        output->SetAMRBox(levelId, boxId, this->Internal->Grids[globalBoxId].amrbox);
       }
     }
   }
@@ -430,9 +427,9 @@ int vtkAMRAmazeReader::RequestData(
 #endif
           continue;
         }
-        vtkUniformGrid* ug = this->myreader->ReadUniformGrid(levelId, boxId);
+        vtkUniformGrid* ug = this->Internal->ReadUniformGrid(levelId, boxId);
         output->SetDataSet(levelId, boxId, ug);
-        //cerr << "gid2 " << globalBoxId << " " << this->myreader->Grids[globalBoxId].grid_nr << endl;
+        //cerr << "gid2 " << globalBoxId << " " << this->Internal->Grids[globalBoxId].grid_nr << endl;
         ug->Delete();
 #ifdef PARALLEL_DEBUG
         errs << "  read BoxId = " << boxId << " (global id = " << globalBoxId << ")\n";
@@ -440,9 +437,8 @@ int vtkAMRAmazeReader::RequestData(
         for(auto c=0; c < this->GetNumberOfComponents(); c++)
         {
           if(this->PointDataArraySelection->ArrayIsEnabled(this->GetPointArrayName(c)))
-          {  // used to test this->PointDataArraySelection->GetArraySetting(c)
-             //vtkDoubleArray* scalars = this->myreader->ReadVar(levelId, boxId, this->myreader->Labels[c]);
-             vtkDoubleArray* scalars = this->myreader->ReadVisItVar(globalBoxId, (const char*)this->myreader->Labels[c].label);
+          {
+             vtkDoubleArray* scalars = this->Internal->ReadVisItVar(globalBoxId, (const char*)this->Internal->Labels[c].label);
 
              ug->GetPointData()->AddArray(scalars);
              if (!ug->GetPointData()->GetScalars())
@@ -495,12 +491,12 @@ int vtkAMRAmazeReader::RequestData(
 
 int vtkAMRAmazeReader::LoadStars(vtkMultiBlockDataSet* SpherSymStars)
 {
-  this->myreader->BuildStars();
-  int nb_stars = this->myreader->NumberOfSphericallySymmetricStars + this->myreader->NumberOfAxisSymmetricStars;
+  this->Internal->BuildStars();
+  int nb_stars = this->Internal->NumberOfSphericallySymmetricStars + this->Internal->NumberOfAxisSymmetricStars;
   for(auto i=0; i < nb_stars; i++)
   {
-    SpherSymStars->SetBlock(i, this->myreader->Stars[i]);
-    SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->myreader->Stars[i]->GetFieldData()->GetArray(0)->GetName());
+    SpherSymStars->SetBlock(i, this->Internal->Stars[i]);
+    SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->Internal->Stars[i]->GetFieldData()->GetArray(0)->GetName());
   }
 
   return nb_stars;
@@ -512,7 +508,7 @@ void vtkAMRAmazeReader::PrintSelf(ostream& os, vtkIndent indent)
   this->Superclass::PrintSelf(os, indent);
 
   os << "FileName: " << (this->FileName? this->FileName:"(none)") << "\n";
-  os << indent << "Dimensionality: " << this->myreader->GetDimensionality() << endl;
+  os << indent << "Dimensionality: " << this->Internal->GetDimensionality() << endl;
   os << indent << "NumberOfLevels: " << this->GetNumberOfLevels() << endl;
   os << indent << "PointData Available: " << this->GetNumberOfComponents() << endl;
   for(int c=0; c < this->GetNumberOfComponents(); c++)

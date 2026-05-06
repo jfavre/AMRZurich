@@ -457,7 +457,7 @@ vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 
   this->LevelRange[0] = -1;
   this->LevelRange[1] = -1;
-  this->LengthScale = 1; // GUI will ALWAYS overwrite that value
+  this->LengthScale = true; // GUI will ALWAYS overwrite that value
   this->LengthScaleFactor = 1;
   this->ScaleChoice = NoScale;
   //cerr << "AMAZEConstructor\n";
@@ -1273,14 +1273,6 @@ vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
   coords->SetNumberOfComponents(3);
   coords->SetNumberOfTuples(nvals);
 
-/*
-  if(this->LengthScale)
-    {
-    dx[0] = dx[0]/this->LengthScaleFactor;
-    dx[1] = dx[1]/this->LengthScaleFactor;
-    dx[2] = dx[2]/this->LengthScaleFactor;
-    }
-*/
   int Iphi, Itheta, Iradius;
 
   //dx[0] = dx[1]; //. Rolf said the example is wrong 

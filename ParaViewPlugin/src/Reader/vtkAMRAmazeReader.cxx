@@ -166,14 +166,6 @@ int vtkAMRAmazeReader::RequestInformation(
     this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
     int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
     this->Internal->Labels[i].unit[count] = '\0';
-    //if(count == 0)
-    //{
-      //cerr << "found PointDataArray " << this->Internal->Labels[i].label << "\n";
-    //}
-    //else
-    //{
-      //cerr << "found PointDataArray " << this->Internal->Labels[i].label << " [" << this->Internal->Labels[i].unit << "]\n";
-    //}
   }
   std::vector<unsigned int> blocksPerLevel;
   blocksPerLevel.reserve(this->GetNumberOfLevels());
@@ -206,8 +198,6 @@ int vtkAMRAmazeReader::RequestInformation(
         output->SetAMRBox(levelId,
                            GridId,
                            this->Internal->Grids[globalBoxId].amrbox);
-        //output->SetDataSet(levelId, GridId, 0);
-        //cerr << "gid " << globalBoxId << " " << this->Internal->Grids[globalBoxId].amrbox.GetDimensionality() << endl;
         globalBoxId++;
       }
     }

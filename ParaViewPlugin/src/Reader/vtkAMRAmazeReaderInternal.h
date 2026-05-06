@@ -159,9 +159,9 @@ public:
   vtkGetMacro(LogData, int);
   vtkBooleanMacro(LogData, int);
 
-  vtkSetMacro(LengthScale, int);
-  vtkGetMacro(LengthScale, int);
-  vtkBooleanMacro(LengthScale, int);
+  vtkSetMacro(LengthScale, vtkTypeBool);
+  vtkGetMacro(LengthScale, vtkTypeBool);
+  vtkBooleanMacro(LengthScale, vtkTypeBool);
 
   vtkSetMacro(LengthScaleFactor, double);
   vtkGetMacro(LengthScaleFactor, double);
@@ -215,7 +215,7 @@ public:
   std::map<std::string, std::string> PVlabels;
   void ReadHDF5GridsMetaData(bool);
   void MakeVariableNames();
-  int LengthScale; // will automatically scale the grids to real length
+  vtkTypeBool LengthScale; // will automatically scale the grids to real length
   double LengthScaleFactor;
 
 protected:

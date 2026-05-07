@@ -161,12 +161,8 @@ int vtkAMRAmazeReader::RequestInformation(
   output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
   info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
   
-  for(auto i=0; i < this->GetNumberOfComponents(); i++)
-  {
-    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
-    int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
-    this->Internal->Labels[i].unit[count] = '\0';
-  }
+  this->SetUpDataArraySelections();
+  
   std::vector<unsigned int> blocksPerLevel;
   blocksPerLevel.reserve(this->GetNumberOfLevels());
   for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
@@ -238,6 +234,22 @@ void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block,
   scalars->Delete();
 }
 
+//------------------------------------------------------------------------------
+void vtkAMRAmazeReader::SetUpDataArraySelections()
+{
+  for(auto i=0; i < this->GetNumberOfComponents(); i++)
+  {
+    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
+    int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
+    this->Internal->Labels[i].unit[count] = '\0';
+  }
+}
+
+//------------------------------------------------------------------------------
+int vtkAMRAmazeReader::GetBlockLevel(int blockIdx)
+{
+  return this->Internal->GetBlockLevel(blockIdx);
+}
 //------------------------------------------------------------------------------
 vtkUniformGrid* vtkAMRAmazeReader::GetAMRGrid(int blockIdx)
 {

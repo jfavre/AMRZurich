@@ -119,6 +119,9 @@ protected:
    */
   void GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field);
   
+  int GetBlockLevel(int blockIdx);
+  void SetUpDataArraySelections();
+  
   // The input file's name.
   char* FileName;
 

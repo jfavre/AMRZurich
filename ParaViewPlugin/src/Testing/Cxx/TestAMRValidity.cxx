@@ -32,9 +32,21 @@ int main(int argc, char **argv)
   reader->DebugOff();
   reader->Update();
   
-  vtkSmartPointer<vtkOverlappingAMR> amr;
-  amr = vtkOverlappingAMR::SafeDownCast(reader->GetOutputDataObject(0));
-  std::cout << *amr << endl;
+  vtkOverlappingAMR* amr = nullptr;
+  amr = reader->GetOutput();
+  if (amr != nullptr)
+  {
+    if (!amr->CheckValidity())
+    {
+      std::cerr << "ERROR: output AMR dataset is not valid!\n";
+      return 1;
+    }
+  }
+  else
+  {
+    std::cerr << "ERROR: output AMR dataset is nullptr!";
+    return 1;
+  }
 
   if(argc == 3)
   {

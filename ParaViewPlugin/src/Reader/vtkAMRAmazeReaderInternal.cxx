@@ -1164,10 +1164,13 @@ void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_compone
 // so we use that for the method's signature and we calculate the domain-id
 // domain-id is between 0 and N-1
 
-vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int block)
+vtkUniformGrid* vtkAMRAmazeReaderInternal::GetAMRGrid(int blockIdx)
 {
-  int domain = this->FindDomainId(levelId, block);
-  adG_grid grid = this->Grids[domain];
+  int levelId, b;
+  // need to retrieve my levelId
+  this->FindLevelAndBlock(blockIdx, levelId, b);
+  
+  adG_grid grid = this->Grids[blockIdx];
   // uniform is uniform, so no need to get all 3 DXs. One is enough
 
   double dx[3]; // spacing is constant at a given level
@@ -1218,7 +1221,7 @@ vtkUniformGrid* vtkAMRAmazeReaderInternal::ReadUniformGrid(int levelId, int bloc
                     grid.layout.dimensions[2]);
 
   return ug;
-} // ReadUniformGrid
+} // GetAMRGrid
 
 void
 map_rtp2xyz(double R, double T, double P,

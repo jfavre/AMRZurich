@@ -180,7 +180,7 @@ public:
   int GetBlockLevel(const int domain) const;
   int  FindDomainId(int level, int block);
   void GetSpacing(int level, double *spacing);
-  vtkUniformGrid* ReadUniformGrid(int levelId, int domain);
+  vtkUniformGrid* GetAMRGrid(int blockIdx);
   vtkRectilinearGrid* ReadRectilinearGrid(int domain);
   vtkStructuredGrid* ReadStructuredGrid(int domain);  // for Sphere_LogR
   vtkStructuredGrid* ReadStructuredGrid2(int domain); // for DCR_Cart2Spheres

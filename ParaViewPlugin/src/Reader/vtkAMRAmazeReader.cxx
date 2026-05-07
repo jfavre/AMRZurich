@@ -212,7 +212,7 @@ int vtkAMRAmazeReader::RequestInformation(
   vtkDebugMacro(<< "\nDimensionality: " << this->Internal->GetDimensionality()
                 << "\nNumberOfComponents: " << this->GetNumberOfComponents()
                 << "\nNumberOfLevels: " << this->GetNumberOfLevels()
-                << "\nNumberOfGrids: " << this->GetNumberOfGrids()
+                << "\nNumberOfBlocks: " << this->GetNumberOfBlocks()
                 );
 
   output->GenerateParentChildInformation();
@@ -224,6 +224,25 @@ int vtkAMRAmazeReader::RequestInformation(
 
   return 1;
 } // end of ExecuteInformation
+
+//------------------------------------------------------------------------------
+void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field)
+{
+  vtkDoubleArray* scalars = this->Internal->ReadVisItVar(blockIdx, field);
+
+  block->GetPointData()->AddArray(scalars);
+  if (!block->GetPointData()->GetScalars())
+  {
+    block->GetPointData()->SetScalars(scalars);
+  }
+  scalars->Delete();
+}
+
+//------------------------------------------------------------------------------
+vtkUniformGrid* vtkAMRAmazeReader::GetAMRGrid(int blockIdx)
+{
+  return this->Internal->GetAMRGrid(blockIdx);
+}
 
 int vtkAMRAmazeReader::RequestData(
   vtkInformation*, vtkInformationVector**, vtkInformationVector* outputVector)
@@ -406,7 +425,6 @@ int vtkAMRAmazeReader::RequestData(
 #ifdef PARALLEL_DEBUG
       errs << "Level = " << levelId << ", numBoxes = " <<  this->GridsPerLevels(levelId) << endl;
 #endif
-
       for (int boxId=0; boxId < this->GridsPerLevels(levelId); boxId++, globalBoxId++)
       {
         if( ((endBoxId - globalBoxId) % numberOfPieces) != piece)
@@ -417,7 +435,7 @@ int vtkAMRAmazeReader::RequestData(
 #endif
           continue;
         }
-        vtkUniformGrid* ug = this->Internal->ReadUniformGrid(levelId, boxId);
+        vtkUniformGrid* ug = this->GetAMRGrid(this->Internal->FindDomainId(levelId, boxId));
         output->SetDataSet(levelId, boxId, ug);
         //cerr << "gid2 " << globalBoxId << " " << this->Internal->Grids[globalBoxId].grid_nr << endl;
         ug->Delete();
@@ -428,14 +446,7 @@ int vtkAMRAmazeReader::RequestData(
         {
           if(this->PointDataArraySelection->ArrayIsEnabled(this->GetPointArrayName(c)))
           {
-             vtkDoubleArray* scalars = this->Internal->ReadVisItVar(globalBoxId, (const char*)this->Internal->Labels[c].label);
-
-             ug->GetPointData()->AddArray(scalars);
-             if (!ug->GetPointData()->GetScalars())
-             {
-               ug->GetPointData()->SetScalars(scalars);
-             }
-             scalars->Delete();
+            this->GetAMRGridPointData(globalBoxId, ug, (const char*)this->Internal->Labels[c].label);
           } // variable was selected for reading
         }  // end of reading of all components
 

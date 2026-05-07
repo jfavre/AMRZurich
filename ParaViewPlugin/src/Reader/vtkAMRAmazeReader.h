@@ -33,7 +33,7 @@ public:
 
   int GetNumberOfComponents(){return Internal->NumberOfComponents;};
   int GetNumberOfLevels(){return Internal->NumberOfLevels;};
-  int GetNumberOfGrids(){return Internal->NumberOfGrids;};
+  int GetNumberOfBlocks(){return Internal->NumberOfGrids;};
 
   double GetTime(){return Internal->GetAMAZETime();};
   void SetTime(double T) {Internal->SetAMAZETime(T);};
@@ -103,6 +103,22 @@ protected:
  
   virtual int FillOutputPortInformation(int port, vtkInformation* info);
 
+  /**
+   * See vtkAMRBaseReader::GetAMRGrid
+   */
+  vtkUniformGrid* GetAMRGrid(int blockIdx);
+
+  /**
+   * See vtkAMRBaseReader::GetAMRGridData   for CellData NOT USED here
+   */
+  void GetAMRGridData(int vtkNotUsed(blockIdx), vtkUniformGrid* vtkNotUsed(block),
+    const char* vtkNotUsed(field)) {};
+
+  /**
+   * See vtkAMRBaseReader::GetAMRGridPointData
+   */
+  void GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field);
+  
   // The input file's name.
   char* FileName;
 

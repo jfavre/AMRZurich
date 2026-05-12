@@ -27,6 +27,7 @@
 #define PARALLEL_DEBUG 1
 
 #include <vector>
+#include <limits>
 #include <string>
 #include <map>
 #include <sstream>
@@ -56,7 +57,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
   this->LevelRange[0] = -1;
   this->LevelRange[1] = -1;
   this->SetNumberOfInputPorts(0);
-  this->LengthScaleFactor = 1e13; // bogus
+  this->LengthScaleFactor = std::numeric_limits<float>::max(); // bogus
   this->SetNumberOfOutputPorts(2);
 // this is for port number 1 which we do in all cases.
   vtkMultiBlockDataSet *pd = vtkMultiBlockDataSet::New();

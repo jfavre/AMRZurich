@@ -1,0 +1,7 @@
+NAME
+  pvAMAZEReader2
+DESCRIPTION
+  Reader for visualization of AMAZE data
+REQUIRES_MODULES
+  VTK::CommonCore
+  VTK::CommonExecutionModel

@@ -1,0 +1,134 @@
+<ServerManagerConfiguration>
+  <!-- ================================================== -->
+  <ProxyGroup name="sources">
+    <SourceProxy class="vtkAMRAmazeReader"
+           label="AMAZE AMR Reader"
+           name="AMAZEReaderCore">
+      <OutputPort index="0"
+                  name="AMR"/>
+      <OutputPort index="1"
+                 name="Stars"/>
+      <StringVectorProperty animateable="0"
+                            command="SetFileName"
+                            name="FileName"
+                            number_of_elements="1"
+                            >
+        <FileListDomain name="files"/>
+        <Documentation>
+          This property specifies the file name for the AMAZE reader.
+        </Documentation>
+      </StringVectorProperty>
+
+     <IntVectorProperty 
+        name="LevelRange"
+        command="GetLevelRange"
+        information_only="1">
+       <SimpleIntInformationHelper/>
+     </IntVectorProperty>
+
+     <IntVectorProperty 
+        name="LevelSet" 
+        command="SetLevelRead"
+        number_of_elements="2"
+        default_values="0 0"
+        label="Level Range">
+          <IntRangeDomain name="range">
+            <RequiredProperties>
+               <Property name="LevelRange" function="Range"/>
+            </RequiredProperties>
+          </IntRangeDomain>         
+          <Documentation>
+            The values of this property specify the upper and lower bounds of the hierarchy level.
+          </Documentation>
+     </IntVectorProperty>
+
+     <IntVectorProperty 
+        name="LogData" 
+        command="SetLogData"
+        number_of_elements="1"
+        default_values="0"
+        label="Compute Log10">
+      <BooleanDomain name="bool" />
+      <Documentation>
+            Will compute log10() of the standard variables (density, temperature, pressure)
+      </Documentation>
+     </IntVectorProperty>
+
+     <IntVectorProperty 
+        name="ShiftedGrid" 
+        command="SetShiftedGrid"
+        number_of_elements="1"
+        default_values="0"
+        label="Shifted Grid">
+      <BooleanDomain name="bool" />
+      <Documentation>
+            ShiftedGrid is used to animate slabs in stationary position
+      </Documentation>
+     </IntVectorProperty>
+ 
+     <IntVectorProperty 
+        name="LengthScale" 
+        command="SetLengthScale"
+        number_of_elements="1"
+        default_values="1"
+        label="Apply Length Scale Factor">
+      <BooleanDomain name="bool" />
+      <Documentation>
+            Will scale the grids to Physical Scale
+      </Documentation>
+     </IntVectorProperty>
+ 
+      <IntVectorProperty command="SetScaleChoice"
+                         default_values="3"
+                         name="BoxLength"
+                         number_of_elements="1">
+        <EnumerationDomain name="enum">
+          <Entry text="pc"
+                 value="0" />
+          <Entry text="AU"
+                 value="1" />
+          <Entry text="RSun"
+                 value="2" />
+          <Entry text="No-scale"
+                 value="3" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+
+     <StringVectorProperty
+        name="PointArrayInfo"
+        information_only="1">
+        <ArraySelectionInformationHelper attribute_name="Point"/>
+     </StringVectorProperty>
+
+     <StringVectorProperty
+        name="PointArrayStatus"
+        command="SetPointArrayStatus"
+        number_of_elements="2"
+        repeat_command="1"
+        number_of_elements_per_command="2"
+        element_types="2 0"
+        information_property="PointArrayInfo">
+       <ArraySelectionDomain name="array_list">
+          <RequiredProperties>
+             <Property name="PointArrayInfo" function="ArrayList"/>
+          </RequiredProperties>
+       </ArraySelectionDomain>
+     </StringVectorProperty>
+
+      <DoubleVectorProperty information_only="1"
+                            name="TimestepValues"
+                            repeatable="1">
+        <TimeStepsInformationHelper />
+        <Documentation>
+          Available timestep values.
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <Hints>
+        <ReaderFactory extensions="amr5"
+                       file_description="HDF5 AMAZE files" />
+      </Hints>
+    </SourceProxy>
+  </ProxyGroup>
+</ServerManagerConfiguration>
+

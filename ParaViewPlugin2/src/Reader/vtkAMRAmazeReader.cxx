@@ -61,7 +61,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
   this->GetExecutive()->SetOutputData(1, pd);
   pd->Delete();
 // this is for port number 1 which we do in all cases.
-  this->Internal = vtkAMRAmazeReaderInternal::New();
+  this->Internal = new vtkAMRAmazeReaderInternal();
 }
 
 //------------------------------------------------------------------------------
@@ -74,7 +74,7 @@ vtkAMRAmazeReader::~vtkAMRAmazeReader()
     }
 
   this->PointDataArraySelection->Delete();
-  this->Internal->Delete();
+  delete this->Internal;
 }
 
 vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname )
@@ -190,7 +190,7 @@ void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block,
 //------------------------------------------------------------------------------
 void vtkAMRAmazeReader::SetUpDataArraySelections()
 {
-  for(auto i=0; i < this->Internal->GetNumberOfComponents(); i++)
+  for(auto i=0; i < this->Internal->NumberOfComponents; i++)
   {
     this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
     int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "

@@ -226,8 +226,6 @@ static hid_t Create_SpherSymStar_Compound()
   return id;
 }
 
-vtkStandardNewMacro(vtkAMRAmazeReaderInternal);
-
 vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 {
   //this->FileName = NULL;
@@ -238,10 +236,9 @@ vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
   this->Labels.clear();
   this->Grids.clear();
   this->Stars.clear();
-  this->LogDataOn();
-  this->DataScaleOn();
-  this->CellCenteredOff();
-  this->DebugOff();
+  this->LogData = false;
+  this->DataScale = 1;
+
   this->MaxLevelWrite = -1;
 
   this->LevelRead[0] = -1;
@@ -250,7 +247,7 @@ vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
   this->LevelRange[0] = -1;
   this->LevelRange[1] = -1;
   this->LengthScale = true; // GUI will ALWAYS overwrite that value
-  this->LengthScaleFactor = 1;
+  this->LengthScaleFactor = 1.0;
   this->ScaleChoice = NoScale;
   //cerr << "AMAZEConstructor\n";
   this->VarNamesToLog["Density"] = 1;

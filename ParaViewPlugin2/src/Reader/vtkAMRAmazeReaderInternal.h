@@ -143,58 +143,19 @@ typedef struct DCR_Mapping
 //                     Class  vtkAmazeReaderInternal (begin)
 // ----------------------------------------------------------------------------
 
-class vtkAMRAmazeReaderInternal: public vtkObject
+class vtkAMRAmazeReaderInternal
 {
 public:
-  vtkTypeMacro(vtkAMRAmazeReaderInternal, vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent);
-  static vtkAMRAmazeReaderInternal* New();
 
-  void SetFileName(VTK_FILEPATH char* fileName) { this->FileName = fileName; }
-  vtkGetFilePathMacro(FileName);
+  vtkAMRAmazeReaderInternal();
+  ~vtkAMRAmazeReaderInternal();
   
-  // Description:
-  // Get the number of components (similar to NumberOfComponents
-  // in data arrays)
-  vtkGetMacro(NumberOfComponents, int);
-
-  vtkGetMacro(NumberOfLevels, int);
-  vtkGetMacro(NumberOfGrids, int);
-
-  vtkGetMacro(Dimensionality, int);
-
-  vtkSetMacro(AMAZETime, double);
-  vtkGetMacro(AMAZETime, double);
-
-  vtkSetMacro(MaxLevelWrite, int);
-  vtkGetMacro(MaxLevelWrite, int);
+  void SetFileName(VTK_FILEPATH char* fileName) { this->FileName = fileName; }
 
   // The range of valid levels values.
   int LevelRange[2];
-  vtkGetVector2Macro(LevelRange, int);
-
   int LevelRead[2];
-  vtkSetVector2Macro(LevelRead, int);
-  vtkGetVector2Macro(LevelRead, int);
-
-  vtkSetMacro(LogData, int);
-  vtkGetMacro(LogData, int);
-  vtkBooleanMacro(LogData, int);
-
-  vtkSetMacro(LengthScale, vtkTypeBool);
-  vtkGetMacro(LengthScale, vtkTypeBool);
-  vtkBooleanMacro(LengthScale, vtkTypeBool);
-
-  vtkSetMacro(LengthScaleFactor, double);
-  vtkGetMacro(LengthScaleFactor, double);
-
-  vtkSetMacro(DataScale, int);
-  vtkGetMacro(DataScale, int);
-  vtkBooleanMacro(DataScale, int)
-
-  vtkSetMacro(CellCentered, int);
-  vtkGetMacro(CellCentered, int);
-  vtkBooleanMacro(CellCentered, int);
 
   int  ReadMetaData(); // returns nb of stars
 
@@ -237,21 +198,18 @@ public:
   std::map<std::string, std::string> PVlabels;
   void ReadHDF5GridsMetaData(bool);
   void MakeVariableNames();
-  vtkTypeBool LengthScale; // will automatically scale the grids to real length
+  bool LengthScale; // will automatically scale the grids to real length
   double LengthScaleFactor;
 
 protected:
-  vtkAMRAmazeReaderInternal();
-  ~vtkAMRAmazeReaderInternal();
+
   // The input file's name.
   hid_t file_id;
   //std::string FileName;
   char* FileName = nullptr;
-  int LogData; // will automatically calculate log10() for Density, Temperature and Pressure
+  bool LogData; // will automatically calculate log10() for Density, Temperature and Pressure
   int Dimensionality;
   int DataScale;
-
-  int CellCentered;
 
   int MaxLevelWrite;
 

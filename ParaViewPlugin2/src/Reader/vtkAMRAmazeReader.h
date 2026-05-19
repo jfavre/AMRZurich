@@ -12,7 +12,7 @@
 #include "vtkIOAMRModule.h" // For export macro
 
 class vtkOverlappingAMR;
-#include "vtkAMRAmazeReaderInternal.h"
+class vtkAMRAmazeReaderInternal;
 class vtkMultiBlockDataSet;
 
 class VTKIOAMR_EXPORT vtkAMRAmazeReader : public vtkAMRBaseReader

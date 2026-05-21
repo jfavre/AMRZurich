@@ -43,7 +43,8 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
   this->LogDataOn();
   this->DataScaleOn();
   this->ShiftedGridOff();
-  this->PointDataArraySelection = vtkDataArraySelection::New();
+  if(this->PointDataArraySelection == nullptr)
+    this->PointDataArraySelection = vtkDataArraySelection::New();
   this->DebugOff();
   this->MaxLevelWrite = -1;
 
@@ -76,7 +77,7 @@ vtkAMRAmazeReader::~vtkAMRAmazeReader()
     this->FileName = nullptr;
     }
 
-  this->PointDataArraySelection->Delete();
+  //this->PointDataArraySelection->Delete();
   delete this->Internal;
 }
 
@@ -269,11 +270,10 @@ void vtkAMRAmazeReader::SetUpDataArraySelections()
   {
     std::cerr << __LINE__ << "PointDataArraySelection->AddArray(" <<  this->Internal->Labels[i].label << ")\n";
     // all arrays are added as disabled.
-    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label, false);
+    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
     int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
     this->Internal->Labels[i].unit[count] = '\0';
   }
-  
-  //this->CellDataArraySelection->AddArray("fake", false);
+  this->Internal->MakeVariableNames();
 }
 

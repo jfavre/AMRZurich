@@ -18,6 +18,7 @@ VTK_MODULE_INIT(vtkInteractionStyle);
 #include "vtkLookupTable.h"
 #include "vtkOutlineCornerFilter.h"
 #include "vtkOutlineFilter.h"
+#include "vtkPartitionedDataSet.h"
 #include "vtkPlane.h"
 #include "vtkPointData.h"
 #include "vtkPolyDataMapper.h"
@@ -39,7 +40,7 @@ using namespace std;
 #define VTK_CREATE(type, var) \
   vtkSmartPointer<type> var = vtkSmartPointer<type>::New();
 
-//#define ALL 1
+#define ALL 1
 
 int main(int argc, char **argv)
 {
@@ -51,31 +52,51 @@ int main(int argc, char **argv)
   timer->StartTimer();
 
   VTK_CREATE(vtkAMRAmazeReader, reader);
-  reader->SetFileName("/local/data/Walder/jet3d.amr5");
+  if(argc < 2)
+    {
+    std::cerr << "missing a filename argument: Syntax ./bin/TestJet3D <path-to>/jet3d.amr5\n";
+    exit(1);
+    }
+  std::cout << "Opening " <<  argv[1] << std::endl;
+  reader->SetFileName(argv[1]);
   reader->DebugOn();
-  //reader->DataScaleOn();
-  //reader->LogDataOn();
+  reader->DataScaleOn();
+  reader->LogDataOn();
   reader->UpdateInformation();
-  //reader->DisableAll();
-  //reader->Enable("Density");
-  //reader->SetPhysicalSpaceScale(1.0);
-  //reader->SetPointArrayStatus("Magnetic field", 0);
-  //reader->SetLevelRead(0, 4);
+  //reader->SetPointArrayStatus("Density", 1);
+  auto NbOfLevels = reader->GetNumberOfLevels();
+  reader->SetMaxLevel(NbOfLevels);
   reader->Update();
-  //static_cast<vtkOverlappingAMR*>(reader->GetOutput())->Audit();
-  //reader->GetOutput()->Print(cout);
+  
+  bool status = static_cast<vtkOverlappingAMR*>(reader->GetOutput())->CheckValidity();
+
+  double range[2];
+  vtkDataSet *ds = reader->GetOutput()->GetPartitionedDataSet(0)->GetPartition(0);
+  for(auto i=0; i < ds->GetPointData()->GetNumberOfArrays(); i++)
+  {
+    ds->GetPointData()->GetRange(ds->GetPointData()->GetArray(i)->GetName(), range);
+    std::cerr << "Dataset \"" << ds->GetPointData()->GetArray(i)->GetName() << "\" " << range[0] << ", " << range[1] << std::endl;
+  }
 
 #ifdef ALL
   VTK_CREATE(vtkContourFilter, contour);
   contour->SetInputConnection(0, reader->GetOutputPort(0));
+#ifdef LOG
   contour->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Log10(Density) [N/cm^3]");
-  //contour->GenerateValues(16, 6876, 6876349);
   contour->GenerateValues(9, 5.46, 7.63);
+#else
+  contour->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Density [N/cm^3]");
+  contour->GenerateValues(16, 6876, 6876349);
+#endif
   contour->ComputeScalarsOn();
   contour->DebugOff();
 
   VTK_CREATE(vtkLookupTable, lut);
+#ifdef LOG
   lut->SetTableRange(5.46, 7.63); // 3.83, 6.83);
+#else
+  lut->SetTableRange(6876, 6876349);
+#endif
   lut->SetHueRange(0.66,0.0);
   lut->SetNumberOfTableValues(256);
   lut->Build();

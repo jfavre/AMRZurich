@@ -963,11 +963,11 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
 {
   hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
-  /*cerr << "domain = " << domain
+  std::cerr << "domain = " << domain
        << ", level = " << levelId
        << ", block = " << block
        << ", varname = " << variable.label
-       << endl;*/
+       << endl;
   adG_grid grid = this->Grids[domain];
 
   //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
@@ -985,6 +985,7 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   vtkDoubleArray*scalars = vtkDoubleArray::New();
   scalars->SetNumberOfComponents(variable.vec_len == 2? 3 : variable.vec_len);
   scalars->SetName((const char*)PVlabels[(const char *)variable.label].c_str());
+  std::cerr << __LINE__ << PVlabels[(const char *)variable.label].c_str()<< endl;
 // default naming. Could be over-written by "Log10()"
 
   int nvals;

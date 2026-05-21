@@ -16,6 +16,7 @@ VTK_MODULE_INIT(vtkInteractionStyle);
 #include "vtkLookupTable.h"
 #include "vtkOutlineCornerFilter.h"
 #include "vtkOutlineFilter.h"
+#include "vtkPartitionedDataSet.h"
 #include "vtkPlane.h"
 #include "vtkPointData.h"
 #include "vtkPolyDataMapper.h"
@@ -58,9 +59,15 @@ int main(int argc, char **argv)
   reader->SetLevelRead(0, 4);
   reader->DebugOff();
   reader->Update();
-  //static_cast<vtkOverlappingAMR*>(reader->GetOutput())->Audit();
-  //reader->GetOutput()->Print(cout);
-
+  bool status = static_cast<vtkOverlappingAMR*>(reader->GetOutput())->CheckValidity();
+  
+  double range[2];
+  vtkDataSet *ds = reader->GetOutput()->GetPartitionedDataSet(0)->GetPartition(0);
+  for(auto i=0; i < ds->GetPointData()->GetNumberOfArrays(); i++)
+  {
+    ds->GetPointData()->GetRange(ds->GetPointData()->GetArray(i)->GetName(), range);
+    std::cerr << "Dataset \"" << ds->GetPointData()->GetArray(i)->GetName() << "\" " << range[0] << ", " << range[1] << std::endl;
+  }
   VTK_CREATE(vtkContourFilter, contour);
   contour->SetInputConnection(0, reader->GetOutputPort(0));
   contour->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Log10(Density) [N/cm^3]");

@@ -23,6 +23,7 @@ int main(int argc, char **argv)
   reader->SetFileName(argv[1]);
   reader->DebugOn();
   reader->DataScaleOn();
+  reader->SetScaleChoice(0);
   reader->LogDataOff();
   reader->UpdateInformation();
   reader->DisableAll();

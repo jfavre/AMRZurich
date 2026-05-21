@@ -591,7 +591,7 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
   //int size = grid[0].dimensions[0];
 
   return nbstars;
-}
+} // ReadMetaData()
 
 /*
 Added the Logical to Physical mappers def.

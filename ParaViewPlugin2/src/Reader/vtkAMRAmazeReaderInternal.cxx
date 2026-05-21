@@ -228,7 +228,7 @@ static hid_t Create_SpherSymStar_Compound()
 
 vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 {
-  //this->FileName = NULL;
+  std::cerr << __LINE__ << "::vtkAMRAmazeReaderInternal()" <<  "" << "\n";
   this->file_id = 0;
   this->Dimensionality = 0;
   this->NumberOfLevels = 0;
@@ -364,6 +364,292 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
 
   return nbstars;
 }
+
+void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_component &variable)
+{
+  hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
+  int domain = this->FindDomainId(levelId, block);
+  /*cerr << "domain = " << domain
+       << ", level = " << levelId
+       << ", block = " << block
+       << ", varname = " << variable.label
+       << endl;*/
+  adG_grid grid = this->Grids[domain];
+
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
+  if(level_root_id < 0)
+    std::cerr << "bad level_root_id returned\n";
+  else
+    {
+    std::string lname = std::format("Grid {}", grid.layout.grid_nr);
+    if(H5Lexists(level_root_id, lname.c_str(), H5P_DEFAULT))
+      {
+      grid_root_id = H5Gopen(level_root_id, lname.c_str(), H5P_DEFAULT);
+      if(grid_root_id < 0)
+        std::cerr << "ReadVar(): bad grid_root_id returned\n";
+
+      int nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
+  /*
+  cerr << lname << ":" << PVlabels[(const char *)variable.label] << "("<< variable.vec_len << "," << nvals << ")\n";
+  cerr << "nvals = " << grid.layout.dimensions[0] << "x"<<
+                    grid.layout.dimensions[1]<< "x"<<
+                    grid.layout.dimensions[2]<< endl;
+*/
+      dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
+      if(dataset_id < 0)
+        {
+        std::cerr << "error opening HDF5 dataset for var " << variable.label << endl;
+        }
+      hid_t space_id;
+      hsize_t dims[3], maxdims;
+      space_id = H5Dget_space(dataset_id);
+      H5Sget_simple_extent_dims(space_id, dims, NULL );
+    
+      H5Sclose(space_id);
+      H5Dclose(dataset_id);
+      H5Gclose(grid_root_id);
+      H5Gclose(level_root_id);
+
+      if(nvals  == dims[0])
+        {
+        //this->CellCenteredOff();
+        }
+      else
+        {
+        //this->CellCenteredOn();
+        }
+      return;
+      }
+    }
+}
+
+void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
+{
+  hid_t   root_id, dataset, adG_grid_id, mapping_id, label1, label2, unitstring;
+  herr_t  status;
+  hid_t   attr1, array0_id, array1_id, array2_id;
+  hsize_t  dim[2];
+
+  if(shiftedGrid)
+    {
+    if(!this->file_id)
+      {
+      this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
+      }
+    //cout << "reading the shifted grid info\n";
+    root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
+    dataset = H5Dopen(root_id, "Shifted Grid Info", H5P_DEFAULT);
+    if(dataset < 0)
+      {
+      std::cerr << "failed to find shifted grid info. Returning without action\n";
+      H5Gclose(root_id);
+      return;
+      }
+    if(this->file_id)
+      {
+      H5Fclose(this->file_id);
+      this->file_id = 0;
+      //cerr << "584: H5Fclose( " << this->FileName << ")\n";
+      }
+    }
+  else
+    {
+    root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
+    dataset = H5Dopen(root_id, "Grid Info", H5P_DEFAULT);
+    }
+  adG_grid_id = H5Tcreate (H5T_COMPOUND, sizeof(adG_grid));
+
+  H5Tinsert(adG_grid_id, "grid number", offsetof(adG_grid_layout, grid_nr), H5T_NATIVE_INT);
+  H5Tinsert(adG_grid_id, "level", HOFFSET(adG_grid_layout, level), H5T_NATIVE_INT);
+
+  dim[0] = adG_MAXDIM;
+  array0_id = H5Tarray_create2(H5T_NATIVE_INT, 1, dim);
+
+  dim[0] = 2 * adG_MAXDIM;
+  array1_id = H5Tarray_create2(H5T_NATIVE_DOUBLE, 1, dim);
+
+  dim[0] = 2 * adG_MAXDIM;
+  array2_id = H5Tarray_create2(H5T_NATIVE_INT, 1, dim);
+
+  H5Tinsert(adG_grid_id, "dimensions", HOFFSET(adG_grid_layout, dimensions),
+            array0_id);
+  H5Tinsert(adG_grid_id, "origin", HOFFSET(adG_grid_layout, origin), array1_id);
+  H5Tinsert(adG_grid_id, "box corners", HOFFSET(adG_grid_layout, box_corners), array2_id);
+
+  H5Tclose(array0_id);
+  H5Tclose(array1_id);
+  H5Tclose(array2_id);
+
+  status = H5Dread(dataset, adG_grid_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->Grids[0]);
+  H5Tclose(adG_grid_id);
+  H5Dclose(dataset);
+
+  for (int levelId=0; levelId < this->NumberOfLevels; levelId++)
+    {
+    std::string name = std::format("Level {}", levelId);
+
+    attr1 = H5Aopen_by_name(root_id, name.c_str(), "Refinement Ratio", H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Aread(attr1, H5T_NATIVE_INT, &this->Levels[levelId].RefRatio);
+    status = H5Aclose(attr1);
+
+    attr1 = H5Aopen_by_name(root_id, name.c_str(), "Cell Edge Length", H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Levels[levelId].DXs[0]);
+    status = H5Aclose(attr1);
+
+    if(H5Aexists_by_name(root_id, name.c_str(), "Cell Edge Length Y", H5P_DEFAULT) > 0)
+      {
+      attr1 = H5Aopen_by_name(root_id, name.c_str(), "Cell Edge Length Y", H5P_DEFAULT, H5P_DEFAULT);
+      if(attr1 >= 0)
+        {
+        status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Levels[levelId].DXs[1]);
+        status = H5Aclose(attr1);
+        }
+      else
+        this->Levels[levelId].DXs[1] = this->Levels[levelId].DXs[0];
+      }
+    else
+      this->Levels[levelId].DXs[1] = this->Levels[levelId].DXs[0];
+
+    if(H5Aexists_by_name(root_id, name.c_str(), "Cell Edge Length Z", H5P_DEFAULT) > 0)
+      {
+      attr1 = H5Aopen_by_name(root_id, name.c_str(), "Cell Edge Length Z", H5P_DEFAULT, H5P_DEFAULT);
+      if(attr1 >= 0)
+        {
+        status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->Levels[levelId].DXs[2]);
+        status = H5Aclose(attr1);
+        }
+      else
+        this->Levels[levelId].DXs[2] = this->Levels[levelId].DXs[0];
+      }
+    else
+      this->Levels[levelId].DXs[2] = this->Levels[levelId].DXs[0];
+
+    //H5Gclose(level_root_id);
+    //cerr << this->Levels[levelId].RefRatio << " ," << this->Levels[levelId].DXs << endl;
+    }
+  H5Gclose(root_id);
+
+  if(this->MappedGrids && (root_id = H5Gopen(this->file_id, "/Map", H5P_DEFAULT) )>= 0)
+    {
+    dataset = H5Dopen(root_id, "Map Parameter", H5P_DEFAULT);
+    if(dataset < 0)
+      {
+      std::cerr << "error opening Map_Parameter\n";
+      }
+    switch(this->MappedGrids) {
+      case Sphere_LogR:
+      label1 = H5Tcopy(H5T_C_S1);
+      H5Tset_size(label1, 15);
+      H5Tset_strpad(label1, H5T_STR_NULLTERM);
+
+      mapping_id = H5Tcreate(H5T_COMPOUND, sizeof(ParamToPhysicalMapping));
+
+      H5Tinsert(mapping_id, "Space Name", HOFFSET(ParamToPhysicalMapping, label), label1);
+      H5Tinsert(mapping_id, "Min Radius", HOFFSET(ParamToPhysicalMapping, Rmin), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Max Radius", HOFFSET(ParamToPhysicalMapping, Rmax), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Min Theta",  HOFFSET(ParamToPhysicalMapping, Tmin), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Max Theta",  HOFFSET(ParamToPhysicalMapping, Tmax), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Min Phi",    HOFFSET(ParamToPhysicalMapping, Pmin), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Max Phi",    HOFFSET(ParamToPhysicalMapping, Pmax), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Stretch Factor", HOFFSET(ParamToPhysicalMapping, StretchFactorOBSOLETE), H5T_NATIVE_DOUBLE);
+      H5Tclose(label1);
+
+      if ((status = H5Dread(dataset, mapping_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, this->SphereLogRMappings)) < 0)
+        {
+        std::cerr << "error reading Map_Parameter\n";
+        }
+/*
+      cerr << "\nparam =\t" << param[0].label << "\n\t";
+      cerr << param[0].Rmin<< "\n\t";
+      cerr << param[0].Rmax << "\n\t";
+      cerr << param[0].Tmin << "\n\t";
+      cerr << param[0].Tmax << "\n\t";
+      cerr << param[0].Pmin << "\n\t";
+      cerr << param[0].Pmax << "\n\t";
+      cerr << param[0].StretchFactorOBSOLETE << "\n\n";
+*/
+      break;
+      
+      case DCR_Cart2Spheres:
+      label1 = H5Tcopy(H5T_C_S1);
+      H5Tset_size(label1, 6);
+      H5Tset_strpad(label1, H5T_STR_NULLTERM);
+      label2 = H5Tcopy(H5T_C_S1);
+      H5Tset_size(label2, 7);
+      H5Tset_strpad(label2, H5T_STR_NULLTERM);
+
+      mapping_id = H5Tcreate(H5T_COMPOUND, sizeof(DCR_Mapping));
+
+
+      H5Tinsert(mapping_id, "Min Radius Physical Space", HOFFSET(DCR_Mapping, Rmin),        H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Max Radius Physical Space", HOFFSET(DCR_Mapping, Rmax),        H5T_NATIVE_DOUBLE);
+      H5Tinsert(mapping_id, "Map Case",                  HOFFSET(DCR_Mapping, MapCase),     label1);
+      H5Tinsert(mapping_id, "Map Lunarity",              HOFFSET(DCR_Mapping, MapLunarity), label2);
+      H5Tinsert(mapping_id, "Dimensionality",            HOFFSET(DCR_Mapping, Dimension),   H5T_NATIVE_INT);
+      H5Tclose(label1);
+      H5Tclose(label2);
+
+      if ((status = H5Dread(dataset, mapping_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->DCR_Mappings)) < 0)
+        {
+        std::cerr << "error reading Map_Parameter\n";
+        }
+      std::cerr << "\nparam =\t"  << "\n\t";
+      std::cerr << DCR_Mappings.Rmin<< "\n\t";
+      std::cerr << DCR_Mappings.Rmax << "\n\t";
+      std::cerr << DCR_Mappings.MapCase << "\n\t";
+      std::cerr << DCR_Mappings.MapLunarity << "\n\t";
+      std::cerr << DCR_Mappings.Dimension << "\n\n";
+      break;
+      
+      default:
+        std::cerr << "error finding an implemented Mapping code\n";
+      break;
+    }
+    H5Tclose(mapping_id); 
+    H5Dclose(dataset);
+    H5Gclose(root_id);
+    }
+} // ReadHDF5GridsMetaData()
+
+void vtkAMRAmazeReaderInternal::ReadHDF5VariablesMetaData()
+{
+  hid_t   root_id, dataset, adG_component_id, labelstring, unitstring;
+  herr_t  status;
+  
+  root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
+  dataset = H5Dopen(root_id, "Variable Info", H5P_DEFAULT);
+
+  labelstring = H5Tcopy(H5T_C_S1);
+                H5Tset_size(labelstring, adG_LABELLENGTH);
+                H5Tset_strpad(labelstring, H5T_STR_NULLTERM);
+  unitstring =  H5Tcopy(H5T_C_S1);
+                H5Tset_size(unitstring, adG_UNITLENGTH-1); 
+                H5Tset_strpad(unitstring, H5T_STR_NULLTERM);
+
+  adG_component_id = H5Tcreate(H5T_COMPOUND, sizeof(adG_component));
+  
+  H5Tinsert(adG_component_id, "vector length", HOFFSET(adG_component, vec_len),
+            H5T_NATIVE_INT);
+  
+  H5Tinsert(adG_component_id, "Variable Name", HOFFSET(adG_component, label),
+                    labelstring);
+    
+  H5Tinsert(adG_component_id, "Variable Unit", HOFFSET(adG_component, unit),
+            unitstring);
+
+  H5Tinsert(adG_component_id, "scale factor",
+            HOFFSET(adG_component, scalefactor), H5T_NATIVE_FLOAT);
+
+  H5Tclose(labelstring);
+  H5Tclose(unitstring);
+
+  status = H5Dread(dataset, adG_component_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &Labels[0]);
+
+  H5Tclose(adG_component_id);
+  H5Dclose(dataset);
+  H5Gclose(root_id);
+}
+
 
 // deciding on adding the Log10 prefix to the name can only be done after UpdateInformation
 // so we make this a separate call
@@ -519,6 +805,262 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
   return nb_stars;
 } // end of ReadHDF5MetaData()
 
+// returns the global id for the given block
+int vtkAMRAmazeReaderInternal::FindDomainId(int level, int block)
+{     
+  int domain = 0;
+  for(int l=0; l < level; l++)
+    domain += this->Levels[l].GridsPerLevel;
+  domain += block;
+  if (domain >= this->NumberOfGrids)
+   
+    std::cerr << "level or block too high for this dataset\n";
+  return domain;
+}
+
+void vtkAMRAmazeReaderInternal::GetSpacing(int level, double *spacing)
+{
+  int domain = this->FindDomainId(level, 0);
+  adG_grid g = this->Grids[domain];
+
+  if(this->Dimensionality == 3)  // a 3D grid
+  {
+    if(this->LengthScale)
+    {
+      spacing[2] = this->Levels[level].DXs[2] / this->LengthScaleFactor;
+      spacing[1] = this->Levels[level].DXs[1] / this->LengthScaleFactor;
+      spacing[0] = this->Levels[level].DXs[0] / this->LengthScaleFactor;
+    }
+    else
+      {
+      spacing[2] = this->Levels[level].DXs[2];
+      spacing[1] = this->Levels[level].DXs[1];
+      spacing[0] = this->Levels[level].DXs[0];
+      }
+  }
+  else
+    {
+    if(this->LengthScale)
+      {
+      spacing[2] = 0.0;
+      spacing[1] = this->Levels[level].DXs[1] / this->LengthScaleFactor;
+      spacing[0] = this->Levels[level].DXs[0] / this->LengthScaleFactor;
+      }
+    else
+      {
+      spacing[2] = 0.0;
+      spacing[1] = this->Levels[level].DXs[1];
+      spacing[0] = this->Levels[level].DXs[0];
+      }
+    }
+}
+
+int vtkAMRAmazeReaderInternal::GetBlockLevel(const int domain) const
+{
+  int gid = domain;
+  int l=0;
+
+  while(gid >= this->Levels[l].GridsPerLevel)
+    {
+    gid -= this->Levels[l].GridsPerLevel;
+    l++;
+    }
+  return l;
+}
+
+vtkUniformGrid* vtkAMRAmazeReaderInternal::GetAMRGrid(int blockIdx)
+{
+  int levelId, b;
+  // need to retrieve my levelId
+  this->FindLevelAndBlock(blockIdx, levelId, b);
+
+  adG_grid grid = this->Grids[blockIdx];
+  // uniform is uniform, so no need to get all 3 DXs. One is enough
+
+  double dx[3]; // spacing is constant at a given level
+  dx[0] = this->Levels[levelId].DXs[0];
+  dx[1] = this->Levels[levelId].DXs[1];
+  dx[2] = this->Levels[levelId].DXs[2];
+
+  vtkStringArray *sarr = vtkStringArray::New();
+  sarr->SetName("GridName");
+  sarr->SetNumberOfComponents(1);
+  sarr->SetNumberOfTuples(1);
+  
+  sarr->SetValue(0, std::format("Grid {}", grid.layout.grid_nr));
+  vtkUniformGrid* ug = vtkUniformGrid::New();
+  ug->Initialize();
+  ug->GetFieldData()->AddArray(sarr);
+  sarr->Delete();
+      
+  if(grid.layout.dimensions[2] > 1)  // a 3D grid
+    {
+    if(this->LengthScale)
+       ug->SetSpacing(dx[0]/this->LengthScaleFactor,
+                      dx[1]/this->LengthScaleFactor,
+                      dx[2]/this->LengthScaleFactor);
+    else
+      ug->SetSpacing(dx[0], dx[1], dx[2]);
+    }
+  else
+    {
+    if(this->LengthScale)
+      ug->SetSpacing(dx[0]/this->LengthScaleFactor,
+                     dx[1]/this->LengthScaleFactor,
+                     0.0);
+    else
+      ug->SetSpacing(dx[0], dx[1], 0.0);
+    }
+  if(this->LengthScale)
+    ug->SetOrigin(grid.layout.origin[0]/this->LengthScaleFactor,
+                  grid.layout.origin[1]/this->LengthScaleFactor,
+                  grid.layout.origin[2]/this->LengthScaleFactor);
+  else
+    ug->SetOrigin(grid.layout.origin[0], grid.layout.origin[1], grid.layout.origin[2]);
+  ug->SetDimensions(grid.layout.dimensions[0],
+                    grid.layout.dimensions[1],
+                    grid.layout.dimensions[2]);
+
+  return ug;
+} // GetAMRGrid
+
+// returns the level and block id at that level for the given global id
+void  vtkAMRAmazeReaderInternal::FindLevelAndBlock(int domain, int &level, int &block) const
+{
+  int gid = domain;
+  int l=0; 
+    
+  while(gid >= this->Levels[l].GridsPerLevel)
+    {
+    gid -= this->Levels[l].GridsPerLevel;
+    l++;
+    }
+  level = l;
+  block = gid;
+}
+
+vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *varname)
+{
+// find which adG_component that is and then go ahead
+  int i=0, level, block;
+  while(i < this->NumberOfComponents)
+    {
+    if(!(strcmp(varname, this->Labels[i].label)))
+      break;
+    i++;
+    }
+  //cerr << "found label "<< i << ", " << this->Labels[i].label << endl;
+  if(i < this->NumberOfComponents) // reached the end without finding it.
+    {
+    this->FindLevelAndBlock(domain, level, block);
+    return this->ReadVar(level, block, this->Labels[i]);
+    }
+  else
+    return nullptr;
+}
+
+vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_component &variable)
+{
+  hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
+  int domain = this->FindDomainId(levelId, block);
+  /*cerr << "domain = " << domain
+       << ", level = " << levelId
+       << ", block = " << block
+       << ", varname = " << variable.label
+       << endl;*/
+  adG_grid grid = this->Grids[domain];
+
+  //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
+  this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
+  if(level_root_id < 0)
+    std::cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
+
+  grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.layout.grid_nr).c_str(), H5P_DEFAULT);
+  if(grid_root_id < 0)
+    std::cerr << __LINE__<< ": ReadVar(): bad grid_root_id returned\n";
+
+// for 2D case with 2D vectors, we create a 3-tuple anyway, fill in the 3rd component with zeroes
+// and we must define a hyperslab select to only fill in the first 2 columns.
+  vtkDoubleArray*scalars = vtkDoubleArray::New();
+  scalars->SetNumberOfComponents(variable.vec_len == 2? 3 : variable.vec_len);
+  scalars->SetName((const char*)PVlabels[(const char *)variable.label].c_str());
+// default naming. Could be over-written by "Log10()"
+
+  int nvals;
+  if(0) //GetCellCentered())
+    {
+    if(grid.layout.dimensions[2] != 1)
+      nvals = (grid.layout.dimensions[0]-1) * (grid.layout.dimensions[1]-1) * (grid.layout.dimensions[2]-1);
+    else
+      nvals = (grid.layout.dimensions[0]-1) * (grid.layout.dimensions[1]-1);
+    }
+  else
+    nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
+/*
+  cerr << lname << ":" << PVlabels[(const char *)variable.label] << "("<< variable.vec_len << "," << nvals << ")\n";
+  cerr << "nvals = " << grid.layout.dimensions[0] << "x"<<
+                    grid.layout.dimensions[1]<< "x"<<
+                    grid.layout.dimensions[2]<< endl;
+*/
+  hsize_t dims[2], count[2], offset[2];
+  dims[0] = nvals;
+  dims[1] =  variable.vec_len == 2 ? 3 : variable.vec_len;
+  mem_space_id = H5Screate_simple(2,  dims, NULL);
+
+  offset[0] = 0; offset[1] = 0;
+  count[0] = nvals; count[1] = variable.vec_len;
+  H5Sselect_hyperslab (mem_space_id, H5S_SELECT_SET, offset, NULL, count, NULL);
+
+  scalars->SetNumberOfTuples(nvals);
+  std::cerr << __LINE__ << " :reading PointDataArray " << variable.label << std::endl;
+  void *dataArray = scalars->GetVoidPointer(0);
+
+  dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
+  if(dataset_id < 0)
+     {
+     std::cerr << "error opening HDF5 dataset for var " << variable.label << endl;
+     }
+
+  if(H5Dread(dataset_id, H5T_NATIVE_DOUBLE, mem_space_id, H5S_ALL, H5P_DEFAULT, dataArray) < 0)
+     {
+     std::cerr << __LINE__ << " :error reading HDF5 dataset for var " << variable.label << endl;
+     }
+
+  double *dArray = (double *)dataArray;
+  if(variable.vec_len == 2) for(int k=0; k < nvals * 3; k+=3) dArray[k+2] = 0;
+
+  if(this->DataScale == true && variable.scalefactor != 1.0)
+    {
+    std::cerr << __LINE__ << " :should divide by scaling factor "<< variable.scalefactor << " for " << variable.label << std::endl;
+    for(int k=0; k < nvals * variable.vec_len; k++)
+      {
+      dArray[k] /= variable.scalefactor;
+      }
+    }
+
+  if(this->VarNamesToLog.find((const char *)variable.label) == this->VarNamesToLog.end())
+    {
+     //std::cout<< variable.label << " is not in the map!"<<endl;
+    }
+  else if(this->LogData)
+    {
+    for(int k=0; k < nvals ; k++)
+      {
+      dArray[k] = log10(dArray[k]);
+      }
+    }
+  H5Sclose(mem_space_id);
+  H5Dclose(dataset_id);
+  H5Gclose(grid_root_id);
+  H5Gclose(level_root_id);
+  if(this->file_id)
+    {
+    H5Fclose(this->file_id);
+    this->file_id = 0;
+    }
+  return scalars;
+}
 
 
 VTK_ABI_NAMESPACE_END

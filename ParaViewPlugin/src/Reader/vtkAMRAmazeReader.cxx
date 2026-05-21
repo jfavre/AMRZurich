@@ -116,10 +116,6 @@ int vtkAMRAmazeReader::RequestInformation(
   }
 
   vtkInformation* info = outputVector->GetInformationObject(0);
-  //info->Set(vtkStreamingDemandDrivenPipeline::MAXIMUM_NUMBER_OF_PIECES(), -1);
-
-  //vtkInformation* info1 = outputVector->GetInformationObject(1);
-  //info1->Set(vtkStreamingDemandDrivenPipeline::MAXIMUM_NUMBER_OF_PIECES(), -1);
 
   vtkOverlappingAMR *output = static_cast<vtkOverlappingAMR *>(
     info->Get(vtkDataObject::DATA_OBJECT()));
@@ -128,9 +124,6 @@ int vtkAMRAmazeReader::RequestInformation(
     output = vtkOverlappingAMR::New();
     //cout << __LINE__ << " : Got a New vtkOverlappingAMR* = " << output << std::endl;
   }
-
-  int levelId;
-  double time, time_scalor;
 
   if ( this->FileName == NULL || this->FileName[0] == '\0'  )
   {
@@ -147,26 +140,39 @@ int vtkAMRAmazeReader::RequestInformation(
   //cerr << __LINE__ << "vtkAMRAmazeReader::RequestInformation() Fname = " << this->FileName << "\n";
   this->Internal->SetFileName(this->FileName);
 
+  this->FillMetaData(output);
+
+  if(output)
+    outputVector->GetInformationObject(0)->Set(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA(), output);
+  else
+    outputVector->GetInformationObject(0)->Remove(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA());
+
+  return 1;
+} // end of ExecuteInformation
+
+//------------------------------------------------------------------------------
+void vtkAMRAmazeReader::FillMetaData(vtkOverlappingAMR *output)
+{
   this->nbstars = this->Internal->ReadMetaData();
 
   this->LevelRange[0] = 0;
   this->LevelRange[1] = this->Internal->NumberOfLevels-1;
 
   double localTime = this->GetTime();
-  double timeRange[2] = {localTime, localTime};
-  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
-  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
+  //double timeRange[2] = {localTime, localTime};
+  //info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
+  //info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
 
   //cerr << __LINE__ << "Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS() = " << localTime << "\n";
-  info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
+  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
   output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
-  info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
+  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
   
   this->SetUpDataArraySelections();
   
   std::vector<unsigned int> blocksPerLevel;
   blocksPerLevel.reserve(this->GetNumberOfLevels());
-  for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
+  for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
   {
     blocksPerLevel.push_back(this->GridsPerLevels(levelId));
   }
@@ -177,17 +183,24 @@ int vtkAMRAmazeReader::RequestInformation(
   else
     output->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XYZ_GRID);
 
-  int current_level = -1;
-  std::vector<adG_grid> &grid = this->Internal->Grids;
-
   double spacing[3];
-  int globalBoxId = 0;
-  for (levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
+  int globalBoxId = 0, refratio;
+  for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
   {
     this->Internal->GetSpacing(levelId, spacing);
     output->SetSpacing(levelId, spacing);
-    //cout << __LINE__ << ": output->SetSpacing(" << levelId << ", " << spacing[0]<< ", " << spacing[1]<< ", " << spacing[2] << ")\n";
-    // old output->SetNumberOfDataSets(levelId, this->GridsPerLevels[levelId]);
+
+    if (levelId == this->GetNumberOfLevels() - 1) // we are at finest level of refinement
+    {
+      refratio = 1;
+    }
+    else
+    {
+      refratio = this->Internal->Levels[levelId+1].RefRatio; // note the offset by +1
+    }
+    output->SetRefinementRatio(levelId, refratio);
+    std::cerr << "Level " <<  levelId << ": RefRatio = " << refratio << ", spacing = [ " << spacing[0] << ", " << spacing[1] <<  ", " << spacing[2] << "]\n";
+
     if ( levelId >= this->Internal->MinLevelRead && levelId <= this->Internal->MaxLevelRead )
     {
       for (auto GridId=0; GridId < this->GridsPerLevels(levelId); GridId++)
@@ -211,16 +224,17 @@ int vtkAMRAmazeReader::RequestInformation(
                 << "\nNumberOfLevels: " << this->GetNumberOfLevels()
                 << "\nNumberOfBlocks: " << this->GetNumberOfBlocks()
                 );
+  double bb[6];             
+  for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
+  {
+    for (auto GridId=0; GridId < this->GridsPerLevels(levelId); GridId++)
+    {
+     output->GetBounds(levelId, GridId, bb);
+     std::cerr << "bb = [ " << bb[0] << ", " << bb[1] <<  ", " << bb[2] << ", "<<  bb[3] << ", " << bb[4] <<  ", " << bb[5] << "]\n";
+    }
+  }
 
-  output->GenerateParentChildInformation();
-
-  if(output)
-    outputVector->GetInformationObject(0)->Set(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA(), output);
-  else
-    outputVector->GetInformationObject(0)->Remove(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA());
-
-  return 1;
-} // end of ExecuteInformation
+}  // FillMetaData()
 
 //------------------------------------------------------------------------------
 void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field)
@@ -413,7 +427,6 @@ int vtkAMRAmazeReader::RequestData(
   errs << "firstLevel = " << firstLevel << ", lastLevel = " <<  lastLevel << endl;
 #endif
 
-  std::vector<adG_grid> &grid = this->Internal->Grids;
   int globalBoxId = 0;
   double spacing[3];
 
@@ -430,6 +443,7 @@ int vtkAMRAmazeReader::RequestData(
       }
     }
   }
+  
   globalBoxId = 0;
   for (int levelId=0; levelId< this->GetNumberOfLevels(); levelId++)
   {

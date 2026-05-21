@@ -121,7 +121,8 @@ protected:
   
   int GetBlockLevel(int blockIdx);
   void SetUpDataArraySelections();
-  
+  void FillMetaData(vtkOverlappingAMR*);
+    
   // The input file's name.
   char* FileName;
 

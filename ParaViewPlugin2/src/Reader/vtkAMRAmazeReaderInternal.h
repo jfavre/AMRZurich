@@ -35,7 +35,6 @@ class vtkDoubleArray;
 class vtkDataArray;
 enum ScaleOption {pc=0, AU, RSun, NoScale};
 enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres};
-//enum Lunarity    {FULL=0, HALF=1, QUARTER=2}
 
 #include <stddef.h>
 
@@ -200,15 +199,15 @@ public:
   void MakeVariableNames();
   bool LengthScale; // will automatically scale the grids to real length
   double LengthScaleFactor;
+  int Dimensionality;
 
+  int GridsPerLevels(int l){ return this->Levels[l].GridsPerLevel; };
+  
 protected:
-
-  // The input file's name.
   hid_t file_id;
-  //std::string FileName;
   char* FileName = nullptr;
   bool LogData; // will automatically calculate log10() for Density, Temperature and Pressure
-  int Dimensionality;
+
   int DataScale;
 
   int MaxLevelWrite;

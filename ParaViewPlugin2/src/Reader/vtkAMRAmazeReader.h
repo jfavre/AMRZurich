@@ -22,7 +22,7 @@ public:
   vtkTypeMacro(vtkAMRAmazeReader, vtkAMRBaseReader);
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
- vtkSetMacro(ShiftedGrid, vtkTypeBool);
+  vtkSetMacro(ShiftedGrid, vtkTypeBool);
   vtkGetMacro(ShiftedGrid, vtkTypeBool);
   vtkBooleanMacro(ShiftedGrid, vtkTypeBool);
 

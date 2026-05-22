@@ -44,26 +44,22 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-  //vtkCompositeDataPipeline* prototype = vtkCompositeDataPipeline::New();
-  //vtkAlgorithm::SetDefaultExecutivePrototype(prototype);
-  //prototype->Delete();
-
   VTK_CREATE(vtkTimerLog, timer);
   timer->StartTimer();
 
   VTK_CREATE(vtkAMRAmazeReader, reader);
   if(argc < 2)
-    {
+  {
     std::cerr << "missing a filename argument: Syntax ./bin/TestJet3D <path-to>/jet3d.amr5\n";
     exit(1);
-    }
+  }
   std::cout << "Opening " <<  argv[1] << std::endl;
   reader->SetFileName(argv[1]);
   reader->DebugOn();
   reader->DataScaleOn();
   reader->LogDataOn();
   reader->UpdateInformation();
-  //reader->SetPointArrayStatus("Density", 1);
+  reader->SetPointArrayStatus("Density", 1);
   auto NbOfLevels = reader->GetNumberOfLevels();
   reader->SetMaxLevel(NbOfLevels);
   reader->Update();

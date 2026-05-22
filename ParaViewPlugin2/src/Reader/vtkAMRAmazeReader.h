@@ -44,17 +44,6 @@ public:
   vtkGetMacro(DataScale, vtkTypeBool);
   vtkBooleanMacro(DataScale, vtkTypeBool)
 
-  vtkSetMacro(MaxLevelWrite, int);
-  vtkGetMacro(MaxLevelWrite, int);
-
-  // The range of valid levels values.
-  int LevelRange[2];
-  vtkGetVector2Macro(LevelRange, int);
-
-  int LevelRead[2];
-  vtkSetVector2Macro(LevelRead, int);
-  vtkGetVector2Macro(LevelRead, int);
-
   /**
    * See vtkAMRBaseReader::GetNumberOfBlocks
    */
@@ -118,10 +107,7 @@ protected:
   void SetUpDataArraySelections() override;
 
   bool IsReady;
-  
-  int MaxLevelWrite;
-  int MaxLevelRead;
-  int MinLevelRead;
+
   unsigned int MaximumLevelsToReadByDefault;
 
   int nbstars;

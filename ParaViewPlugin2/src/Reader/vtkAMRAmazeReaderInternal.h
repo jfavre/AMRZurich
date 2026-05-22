@@ -152,10 +152,6 @@ public:
   
   void SetFileName(VTK_FILEPATH char* fileName) { this->FileName = fileName; }
 
-  // The range of valid levels values.
-  int LevelRange[2];
-  int LevelRead[2];
-
   int  ReadMetaData(); // returns nb of stars
 
   void FindLevelAndBlock(int domain, int &level, int &block) const;
@@ -176,8 +172,7 @@ public:
                                  int AngleResolution);
   
   ScaleOption            ScaleChoice;
-  int MaxLevelRead;
-  int MinLevelRead;
+
   int NumberOfLevels;
   int NumberOfComponents;
   int NumberOfGrids;
@@ -209,8 +204,6 @@ protected:
   bool LogData; // will automatically calculate log10() for Density, Temperature and Pressure
 
   int DataScale;
-
-  int MaxLevelWrite;
 
   FILE *errs;
   int ReadHDF5MetaData();

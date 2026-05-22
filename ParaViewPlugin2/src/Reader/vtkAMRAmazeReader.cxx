@@ -38,21 +38,14 @@ vtkStandardNewMacro(vtkAMRAmazeReader);
 //------------------------------------------------------------------------------
 vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
-  this->FileName = nullptr;
   this->nbstars = 0;
   this->LogDataOn();
   this->DataScaleOn();
   this->ShiftedGridOff();
-  if(this->PointDataArraySelection == nullptr)
-    this->PointDataArraySelection = vtkDataArraySelection::New();
+  //if(this->PointDataArraySelection == nullptr)
+    //this->PointDataArraySelection = vtkDataArraySelection::New();
   this->DebugOff();
-  this->MaxLevelWrite = -1;
 
-  this->LevelRead[0] = -1;
-  this->LevelRead[1] = -1;
-
-  this->LevelRange[0] = -1;
-  this->LevelRange[1] = -1;
   this->SetNumberOfInputPorts(0);
   this->LengthScaleFactor = 1e13; // bogus
 #ifdef MULTI_PORTS
@@ -66,6 +59,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
   this->IsReady = false;
 // this is for port number 1 which we do in all cases.
   this->Internal = new vtkAMRAmazeReaderInternal();
+  this->Initialize();
 }
 
 //------------------------------------------------------------------------------
@@ -134,7 +128,7 @@ void vtkAMRAmazeReader::SetFileName(const char* fileName)
     this->Internal->SetFileName(this->FileName);
     this->LoadedMetaData = false;
 
-    //this->SetUpDataArraySelections();
+    this->SetUpDataArraySelections();
     this->InitializeArraySelections();
   }
 
@@ -183,7 +177,6 @@ int vtkAMRAmazeReader::GetNumberOfLevels()
 //------------------------------------------------------------------------------
 int vtkAMRAmazeReader::FillMetaData()
 {
-  std::cerr << __LINE__ << " :vtkAMRAmazeReader::FillMetaData()\n";
   this->nbstars = this->Internal->ReadMetaData();
 
   double localTime = this->Internal->AMAZETime;
@@ -195,7 +188,7 @@ int vtkAMRAmazeReader::FillMetaData()
   blocksPerLevel.reserve(this->GetNumberOfLevels());
   for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
   {
-    std::cerr << "Level " <<  levelId << " has " << this->Internal->GridsPerLevels(levelId) << " blocks\n";
+    //std::cout << "Level " <<  levelId << " has " << this->Internal->GridsPerLevels(levelId) << " blocks\n";
     blocksPerLevel.push_back(this->Internal->GridsPerLevels(levelId));
   }
   this->Metadata->Initialize(blocksPerLevel);
@@ -222,7 +215,7 @@ int vtkAMRAmazeReader::FillMetaData()
     }
     this->Metadata->SetRefinementRatio(levelId, refratio);
 
-    std::cerr << "Level " <<  levelId << ": RefRatio = " << refratio << ", spacing = [ " << spacing[0] << ", " << spacing[1] <<  ", " << spacing[2] << "]\n";
+    //std::cerr << "Level " <<  levelId << ": RefRatio = " << refratio << ", spacing = [ " << spacing[0] << ", " << spacing[1] <<  ", " << spacing[2] << "]\n";
 
     for (auto GridId=0; GridId < this->Internal->GridsPerLevels(levelId); GridId++)
     {
@@ -245,14 +238,14 @@ int vtkAMRAmazeReader::FillMetaData()
 //------------------------------------------------------------------------------
 vtkUniformGrid* vtkAMRAmazeReader::GetAMRGrid(int blockIdx)
 {
-    std::cerr << __LINE__ << " :vtkAMRAmazeReader::GetAMRGrid(" <<  blockIdx << ")\n";
-    return this->Internal->GetAMRGrid(blockIdx);
+  //std::cerr << __LINE__ << " :vtkAMRAmazeReader::GetAMRGrid(" <<  blockIdx << ")\n";
+  return this->Internal->GetAMRGrid(blockIdx);
 }
 
 //------------------------------------------------------------------------------
 void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field)
 {
-  std::cerr << __LINE__ << " :GetAMRGridPointData(" <<  blockIdx << ", " << field << ")\n";
+  //std::cerr << __LINE__ << " :GetAMRGridPointData(" <<  blockIdx << ", " << field << ")\n";
   vtkDoubleArray* scalars = this->Internal->ReadVisItVar(blockIdx, field);
 
   block->GetPointData()->AddArray(scalars);
@@ -268,9 +261,9 @@ void vtkAMRAmazeReader::SetUpDataArraySelections()
 {
   for(auto i=0; i < this->Internal->NumberOfComponents; i++)
   {
-    std::cerr << __LINE__ << "PointDataArraySelection->AddArray(" <<  this->Internal->Labels[i].label << ")\n";
+    // std::cerr << __LINE__ << "PointDataArraySelection->AddArray(" <<  this->Internal->Labels[i].label << ")\n";
     // all arrays are added as disabled.
-    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label);
+    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label, false);
     int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
     this->Internal->Labels[i].unit[count] = '\0';
   }

@@ -228,7 +228,6 @@ static hid_t Create_SpherSymStar_Compound()
 
 vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 {
-  std::cerr << __LINE__ << "::vtkAMRAmazeReaderInternal()" <<  "" << "\n";
   this->file_id = 0;
   this->Dimensionality = 0;
   this->NumberOfLevels = 0;
@@ -239,13 +238,6 @@ vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
   this->LogData = false;
   this->DataScale = 1;
 
-  this->MaxLevelWrite = -1;
-
-  this->LevelRead[0] = -1;
-  this->LevelRead[1] = -1;
-
-  this->LevelRange[0] = -1;
-  this->LevelRange[1] = -1;
   this->LengthScale = true; // GUI will ALWAYS overwrite that value
   this->LengthScaleFactor = 1.0;
   this->ScaleChoice = NoScale;
@@ -343,15 +335,6 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
       this->Levels[current_level].GridsPerLevel++;
       }
     }
-
-  this->LevelRange[0] = 0;
-  this->LevelRange[1] = this->NumberOfLevels-1;
-
-  this->MinLevelRead = this->LevelRange[0];
-  this->MaxLevelRead = this->LevelRange[1];
-
-  int firstLevel = this->MinLevelRead;
-  int lastLevel = this->MaxLevelRead;
 
   /*
   cout << __LINE__ << "\tDimensionality: " << this->Dimensionality 
@@ -963,14 +946,15 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
 {
   hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
+  /*
   std::cerr << "domain = " << domain
        << ", level = " << levelId
        << ", block = " << block
        << ", varname = " << variable.label
        << endl;
+  */
   adG_grid grid = this->Grids[domain];
 
-  //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
   if(level_root_id < 0)
@@ -985,7 +969,6 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   vtkDoubleArray*scalars = vtkDoubleArray::New();
   scalars->SetNumberOfComponents(variable.vec_len == 2? 3 : variable.vec_len);
   scalars->SetName((const char*)PVlabels[(const char *)variable.label].c_str());
-  std::cerr << __LINE__ << PVlabels[(const char *)variable.label].c_str()<< endl;
 // default naming. Could be over-written by "Log10()"
 
   int nvals;
@@ -1014,7 +997,6 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   H5Sselect_hyperslab (mem_space_id, H5S_SELECT_SET, offset, NULL, count, NULL);
 
   scalars->SetNumberOfTuples(nvals);
-  std::cerr << __LINE__ << " :reading PointDataArray " << variable.label << std::endl;
   void *dataArray = scalars->GetVoidPointer(0);
 
   dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
@@ -1024,16 +1006,15 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
      }
 
   if(H5Dread(dataset_id, H5T_NATIVE_DOUBLE, mem_space_id, H5S_ALL, H5P_DEFAULT, dataArray) < 0)
-     {
-     std::cerr << __LINE__ << " :error reading HDF5 dataset for var " << variable.label << endl;
-     }
+  {
+    std::cerr << __LINE__ << " :error reading HDF5 dataset for var " << variable.label << endl;
+  }
 
   double *dArray = (double *)dataArray;
   if(variable.vec_len == 2) for(int k=0; k < nvals * 3; k+=3) dArray[k+2] = 0;
 
   if(this->DataScale == true && variable.scalefactor != 1.0)
     {
-    std::cerr << __LINE__ << " :should divide by scaling factor "<< variable.scalefactor << " for " << variable.label << std::endl;
     for(int k=0; k < nvals * variable.vec_len; k++)
       {
       dArray[k] /= variable.scalefactor;
@@ -1041,27 +1022,26 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
     }
 
   if(this->VarNamesToLog.find((const char *)variable.label) == this->VarNamesToLog.end())
-    {
+  {
      //std::cout<< variable.label << " is not in the map!"<<endl;
-    }
+  }
   else if(this->LogData)
-    {
+  {
     for(int k=0; k < nvals ; k++)
-      {
+    {
       dArray[k] = log10(dArray[k]);
-      }
     }
+  }
   H5Sclose(mem_space_id);
   H5Dclose(dataset_id);
   H5Gclose(grid_root_id);
   H5Gclose(level_root_id);
   if(this->file_id)
-    {
+  {
     H5Fclose(this->file_id);
     this->file_id = 0;
-    }
+  }
   return scalars;
 }
-
 
 VTK_ABI_NAMESPACE_END

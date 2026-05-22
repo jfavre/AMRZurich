@@ -1044,4 +1044,474 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   return scalars;
 }
 
+vtkPolyData* vtkAMRAmazeReaderInternal::GetStar(int domain)
+{
+  return this->Stars[domain];
+}
+
+#define THETARES 48
+#define PHIRES 24
+int vtkAMRAmazeReaderInternal::BuildStars()
+{
+  hid_t    apr_root_id, dataset1, dataset2, StarsDS, models_root_id;
+  hid_t    attr1, attr2, interactions_root_id;
+  herr_t   status;
+  interaction *interactions = NULL;
+  model *models = NULL;
+
+  int  i, j, nb_stars;
+  herr_t error;
+  this->NumberOfSphericallySymmetricStars = 0;
+  this->NumberOfAxisSymmetricStars = 0;
+  this->Stars.clear();
+
+// turn off error reporting just in case there are no stars
+  H5E_auto2_t func;
+  void *client_data;
+  H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
+  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+  //cerr << "1273: H5Fopen( " << this->FileName << ")\n";
+  this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
+  apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems", H5P_DEFAULT);
+
+  if(apr_root_id < 0)
+    {
+    return 0;
+    }
+  interactions_root_id = H5Gopen(apr_root_id, "Interactions", H5P_DEFAULT);
+  if(interactions_root_id >=0)
+    {
+    attr1 = Create_Interaction_Compound();
+    interactions = new interaction[2];
+
+    dataset1 = H5Dopen(interactions_root_id, "IsotrInfWind", H5P_DEFAULT);
+    if(dataset1 >=0 )
+      {
+      status = H5Dread(dataset1, attr1, H5S_ALL, H5S_ALL, H5P_DEFAULT, &interactions[0]);
+      }
+    else
+      {
+      std::cerr << "error reading Interactions::IsotrInfWind\n";
+      }
+    dataset2 = H5Dopen(interactions_root_id, "Simple Accretors", H5P_DEFAULT);
+    if(dataset2 >=0 )
+      {
+      status = H5Dread(dataset2, attr1, H5S_ALL, H5S_ALL, H5P_DEFAULT, &interactions[1]);
+      }
+    else
+      {
+      std::cerr << "error reading Interactions::Simple Accretors\n";
+      }
+    H5Dclose(dataset1);
+    H5Dclose(dataset2);
+    H5Gclose(interactions_root_id);
+    }
+
+  models_root_id = H5Gopen(apr_root_id, "Stars", H5P_DEFAULT);
+
+  hid_t dataspace;
+  int ModelsArraySize;
+  hsize_t dims_out[1]; // we assume rank = 1
+  dataset1 = H5Dopen(models_root_id, "Stars: Models&Interaction", H5P_DEFAULT);
+  if(dataset1 >=0)
+    {
+    dataspace = H5Dget_space(dataset1);
+    status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+    ModelsArraySize = dims_out[0];
+    //cout << "Found " << dims_out[0] << " models of stars\n";
+    H5Sclose(dataspace);
+    attr2 = Create_StarModel_Compound();
+
+    models = new model[ModelsArraySize];
+    status = H5Dread(dataset1, attr2, H5S_ALL, H5S_ALL, H5P_DEFAULT, models);  
+    H5Tclose(attr2);
+    H5Dclose(dataset1);
+    }
+
+  newstar *newstars=NULL;
+  star *stars=NULL;
+  dataset2 = H5Dopen(models_root_id, "Stars: Present State", H5P_DEFAULT);
+  if(dataset2 >=0) // old-style stars before november 6, 2008
+    {
+    std::cerr << "vtkAMRAmazeReaderInternal::BuildStars(Old-style STARS)\n";
+    dataspace = H5Dget_space(dataset2);
+    status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+    this->NumberOfSphericallySymmetricStars = nb_stars = dims_out[0];
+
+    stars = new star[nb_stars];
+    H5Sclose(dataspace);
+
+    attr2 = Create_Star_Compound();
+    status = H5Dread(dataset2, attr2, H5S_ALL, H5S_ALL, H5P_DEFAULT, stars);
+
+    H5Tclose(attr2);
+    H5Dclose(dataset2);
+    //cout << "Found " << nb_stars << " stars\n";
+
+    for (i=0; i < nb_stars; i++)
+      {
+      //vtkDoubleArray *velo = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> velo;
+      velo->SetNumberOfComponents(3);
+      velo->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+      velo->SetName("Velocity");
+      //vtkDoubleArray *mass = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> mass;
+      mass->SetNumberOfComponents(1);
+      mass->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+      mass->SetName("Mass");
+      //vtkDoubleArray *temp = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> temp;
+      temp->SetNumberOfComponents(1);
+      temp->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+      temp->SetName((const char*)PVlabels["Temperature"].c_str());
+      //vtkDoubleArray *lum = vtkDoubleArray::New();
+      vtkNew<vtkDoubleArray> lum;
+      lum->SetNumberOfComponents(1);
+      lum->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+      lum->SetName("Luminosity");
+
+      vtkSphereSource *ss = vtkSphereSource::New();
+      ss->DebugOff();
+      ss->SetCenter(stars[i].Position[0]/this->LengthScaleFactor, stars[i].Position[1]/this->LengthScaleFactor, stars[i].Position[2]/this->LengthScaleFactor);
+      ss->SetThetaResolution(THETARES);
+      ss->SetPhiResolution(PHIRES);
+      stars[i].Radius *= 1; //6.96e10;
+
+      vtkCharArray *name = vtkCharArray::New();
+      name->SetNumberOfComponents(1);
+
+      if(strstr(stars[i].Interaction, "Wind")) // look for substring "Wind"
+        {
+        for(j=0; j < ModelsArraySize; j++)
+          {
+          if(strstr(models[j].IntActType, "Wind"))
+            {
+            std::cerr << "found the model: " << models[j].IntActType;
+            std::cerr << "multiply by " << interactions[j].CompRadius << endl;
+            stars[i].Radius *= interactions[j].CompRadius;
+            name->SetNumberOfTuples(strlen("Wind"));
+            name->SetName("Wind");
+            }
+          }
+        }
+      else
+        {
+        for(j=0; j < ModelsArraySize; j++)
+          {
+          if(strstr(models[j].IntActType, "Accretor"))
+            {
+            std::cerr << "found the model: " << models[j].IntActType;
+            std::cerr << "multiply by " << interactions[j].CompRadius << endl;
+            stars[i].Radius *= interactions[j].CompRadius;
+            name->SetNumberOfTuples(strlen("Accretor"));
+            name->SetName("Accretor");
+            }
+          }
+        }
+      ss->SetRadius(stars[i].Radius);
+      std::cerr << "radius = "<< stars[i].Radius << endl;
+      ss->Update();
+      for(int k=0; k < THETARES*(PHIRES-2)+2; k++)
+        {
+        velo->SetTypedTuple(k, stars[i].Velocity);
+        mass->SetValue(k, stars[i].Mass);
+        if(this->LogData)
+          temp->SetValue(k, log10(stars[i].Temperature));
+        else
+          temp->SetValue(k, stars[i].Temperature);
+        lum->SetValue(k, stars[i].Luminosity);
+        }
+      ss->GetOutput()->GetFieldData()->AddArray(name);
+      ss->GetOutput()->GetPointData()->AddArray(velo);
+      ss->GetOutput()->GetPointData()->AddArray(mass);
+      ss->GetOutput()->GetPointData()->AddArray(temp);
+      ss->GetOutput()->GetPointData()->AddArray(lum);
+      name->Delete();
+      //velo->Delete();
+      //mass->Delete();
+      //temp->Delete();
+      //lum->Delete();
+      this->Stars.push_back(ss->GetOutput());
+      //ss->Delete();
+      }
+    } // end of old-style stars before november 6, 2008
+
+  else if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
+    {
+    std::cerr << "\n\n";
+    dataspace = H5Dget_space(StarsDS);
+    status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+    nb_stars = dims_out[0];
+
+    newstars = new newstar[nb_stars];
+    H5Sclose(dataspace);
+
+    attr2 = Create_NewStar_Compound();
+    status = H5Dread(StarsDS, attr2, H5S_ALL, H5S_ALL, H5P_DEFAULT, newstars);
+
+    for(i=0; i < nb_stars; i++)
+      {
+      /*
+      std::cout << __LINE__ << ": " << std::format("{:s}\n"
+                               //"  StarTime {:e}\n"
+                               "  Position {:e}, {:e}, {:e}\n"
+                               "  Velocity {:e}, {:e}, {:e}\n"
+                               ,
+                                   newstars[i].InteractionModel,
+                                   //newstars[i].StarTime,
+                                   newstars[i].Position[0], newstars[i].Position[1], newstars[i].Position[2],
+                                   newstars[i].Velocity[0], newstars[i].Velocity[1], newstars[i].Velocity[2]
+                                   ) << std::endl;
+     */
+/*
+      cerr << "star " << i << endl
+           << "  StarTime "             << newstars[i].StarTime  << endl
+           << "  CompRadiusFrac "       << newstars[i].CompRadiusFrac  << endl
+           << "  Mass "                 << newstars[i].Mass  << endl
+           << "  SpectralType "         << newstars[i].SpectralType  << endl
+           << "  Position "             << newstars[i].Position[0]  << ", " << newstars[i].Position[1]  << ", " << newstars[i].Position[2]  << endl
+           << "  Velocity "             << newstars[i].Velocity[0]  << ", " << newstars[i].Velocity[1]  << ", " << newstars[i].Velocity[2]<< endl
+           << "  StarModel "            << newstars[i].StarModel  <<endl
+           << "  StellarEvolution "     << newstars[i].StellarEvolution  << endl
+           << "  StarModelFileName "    << newstars[i].StarModelFileName  << endl
+           << "  InteractionModel "     << newstars[i].InteractionModel  << endl
+           << "  IActionEvolution "     << newstars[i].IActionEvolution  << endl
+           << "  IActionModelFileName " << newstars[i].IActionModelFileName  << endl
+           << endl;
+*/
+      if(strstr(newstars[i].StarModel, "SpherSymStar"))
+        NumberOfSphericallySymmetricStars++;
+      else
+        NumberOfAxisSymmetricStars++;
+      }
+    H5Tclose(attr2);
+
+    if(this->NumberOfSphericallySymmetricStars)
+      {
+      hid_t SpherSymStarCurrent_id = Create_SpherSymStar_Compound();
+      SpherSymStarCurrent *spherStarData = new SpherSymStarCurrent;
+      for (i=0; i < nb_stars; i++)
+        {
+        double Radius;
+        std::string starname = std::format("Star {}", i+1);
+        hid_t attr1, dataspace, starN_G, starN_DS;
+        hsize_t dims_out[1]; // we assume rank = 1
+
+        starN_G = H5Gopen(models_root_id, starname.c_str(), H5P_DEFAULT);
+        if(starN_G >=0)
+          {
+          starN_DS = H5Dopen(starN_G, "SpherSymStar_Current", H5P_DEFAULT);
+          if(starN_DS >=0)
+            {
+            status = H5Dread(starN_DS, SpherSymStarCurrent_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, spherStarData);
+            H5Dclose(starN_DS);
+/*
+           cerr
+           << spherStarData->Radius  << "\t"
+           << spherStarData->Temperature  << "\t"
+           << spherStarData->Luminosity  << "\t"
+           << spherStarData->Omega[0]  << ", " << spherStarData->Omega[1]  << ", " << spherStarData->Omega[2] << "\t"
+           << spherStarData->BField[0]  << ", " << spherStarData->BField[1]  << ", " << spherStarData->BField[2]<< endl;
+*/
+            Radius = spherStarData->Radius;
+            }
+          else
+            Radius=1.0;
+          H5Gclose(starN_G);
+          }
+        else
+          {
+          std::cerr << "Error opening " << starname << endl;
+          }
+
+        vtkNew<vtkDoubleArray> velo;
+        velo->SetNumberOfComponents(3);
+        velo->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+        velo->SetName("Velocity");
+        vtkNew<vtkDoubleArray> mass;
+        mass->SetNumberOfComponents(1);
+        mass->SetNumberOfTuples(THETARES*(PHIRES-2)+2);
+        mass->SetName("Mass");
+        char *p = strchr(newstars[i].InteractionModel, ' ');
+        *p = '\0';
+        vtkCharArray *name = vtkCharArray::New();
+        name->SetNumberOfComponents(1);
+
+        name->SetNumberOfTuples(strlen(newstars[i].InteractionModel));
+        name->SetName(newstars[i].InteractionModel);
+
+        vtkSphereSource *ss = vtkSphereSource::New();
+        ss->SetThetaResolution(THETARES);
+        ss->SetPhiResolution(PHIRES);
+        if(strstr(newstars[i].StarModel, "SpherSymStar"))
+          {
+          double c[3];
+          if(this->LengthScale)
+            {
+            ss->SetCenter(newstars[i].Position[0]/this->LengthScaleFactor,
+                          newstars[i].Position[1]/this->LengthScaleFactor,
+                          newstars[i].Position[2]/this->LengthScaleFactor);
+            ss->GetCenter(c);
+            }
+          else
+            {
+            ss->SetCenter(newstars[i].Position[0],
+                          newstars[i].Position[1],
+                          newstars[i].Position[2]);
+            ss->GetCenter(c);
+            }
+          ss->SetRadius(Radius * newstars[i].CompRadiusFrac * 6.96e10 /this->LengthScaleFactor );
+          std::cout << __LINE__ << ": " << std::format("{:14s} at Position ({:e}, {:e}, {:e}), Radius = {:e}\n",
+                                   newstars[i].InteractionModel, c[0], c[1], c[2], Radius);
+          }
+        ss->Update();
+        for(vtkIdType k=0; k < THETARES*(PHIRES-2)+2; k++)
+          {
+          velo->SetTypedTuple(k, newstars[i].Velocity);
+          mass->SetValue(k, newstars[i].Mass);
+          }
+        ss->GetOutput()->GetFieldData()->AddArray(name);
+        ss->GetOutput()->GetPointData()->AddArray(velo);
+        ss->GetOutput()->GetPointData()->AddArray(mass);
+        name->Delete();
+        this->Stars.push_back(ss->GetOutput());
+        //ss->Delete();
+        }
+      delete spherStarData;
+      H5Tclose(SpherSymStarCurrent_id);
+      }
+
+  // look if there is any Axi-sym star and create a multi-block holder, then quit the loop
+
+    i=0;
+    while(newstars && (i < nb_stars))
+      {
+      if(strstr(newstars[i].StarModel, "AxiSymStar"))
+        {
+        //AxiSymStars = vtkMultiBlockDataSet::New();
+        //Stars->SetBlock(1, AxiSymStars);
+        //AxiSymStars->Delete();
+        //Stars->GetMetaData((unsigned int)1)->Set(vtkCompositeDataSet::NAME(), "AxiSymStars");
+        }
+      i++;
+      }
+
+    if(this->NumberOfAxisSymmetricStars) // AxiSymStars)
+      {
+      hid_t AxiSymStarCurrent_id = Create_AxiSymStar_Compound();
+
+      int J=0; // counter of axis-sym stars
+      for(int I=0; I < nb_stars; I++)
+        {
+        if(strstr(newstars[I].StarModel, "AxiSymStar"))
+          {
+          std::string starname = std::format("Star {}", J+1);
+
+          hid_t attr1, dataspace, starN_G, starN_DS;
+          hsize_t dims_out[1]; // we assume rank = 1
+          //std::cerr << "opening " << starname <<"\n";
+          starN_G = H5Gopen(models_root_id, starname.c_str(), H5P_DEFAULT);
+          AxiSymStarCurrent *axiStarData=NULL;
+          int AngleResolution, AxisDirection=0;
+          if(starN_G >=0)
+            {
+            attr1 = H5Aopen_name(starN_G, "AxiSymStar: NTheta");
+            status = H5Aread(attr1, H5T_NATIVE_INT, &AngleResolution);
+            H5Aclose(attr1);
+            attr1 = H5Aopen_name(starN_G, "AxiSymStar: axis-direction");
+            if(attr1 >= 0)
+              H5Aread(attr1, H5T_NATIVE_INT, &AxisDirection);
+            H5Aclose(attr1);
+
+            starN_DS = H5Dopen(starN_G, "AxiSymStar_Current", H5P_DEFAULT);
+            dataspace = H5Dget_space(starN_DS);
+            status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+            if(AngleResolution != dims_out[0])
+              std::cerr << "sanity check: NTheta resolution is mis-read?\n";
+
+            AngleResolution = dims_out[0];
+            //std::cout << "Found phi array of size " << AngleResolution << " for " << starname << endl;
+            H5Sclose(dataspace);
+
+            axiStarData = new AxiSymStarCurrent[AngleResolution];
+            status = H5Dread(starN_DS, AxiSymStarCurrent_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, axiStarData);
+            H5Tclose(AxiSymStarCurrent_id);
+            H5Dclose(starN_DS);
+            H5Gclose(starN_G);
+            }
+/*
+           cerr << "phi\tRadius\tTemperature\tLuminosity\tEpsilon\tOmega\tBField\n\n";
+          for(int k=0; k < AngleResolution; k++)
+            {
+           cerr
+           << axiStarData[k].Theta  << "\t"
+           << axiStarData[k].Radius  << "\t"
+           << axiStarData[k].Temperature  << "\t"
+           << axiStarData[k].Luminosity  << "\t"
+           << axiStarData[k].Epsilon  << "\t"
+           << axiStarData[k].Omega[0]  << ", " << axiStarData[k].Omega[1]  << ", " << axiStarData[k].Omega[2] << "\t"
+           << axiStarData[k].BField[0]  << ", " << axiStarData[k].BField[1]  << ", " << axiStarData[k].BField[2]<< endl;
+            }
+*/
+          vtkPolyData *AxiSymStar = this->AxisSymStarSource(&newstars[I], axiStarData,
+                                                      AngleResolution);
+          if(AxisDirection == 0 || AxisDirection == 3)
+            {
+            this->Stars.push_back(AxiSymStar);
+            }
+          else if(AxisDirection == 1)
+            {
+            vtkTransform *tf = vtkTransform::New();
+            tf->Translate(0.0, 0.0, 0.0);
+            tf->Scale(1.0, 1.0, 1.0);
+            tf->RotateX(90.0);
+            vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
+            tfpd->SetTransform(tf);
+            tfpd->SetInputData(AxiSymStar);
+            tfpd->Update();
+            tf->Delete();
+            AxiSymStar->Delete();
+            this->Stars.push_back(tfpd->GetOutput());
+            }
+          else if(AxisDirection == 2)
+            {
+            vtkTransform *tf = vtkTransform::New();
+            tf->Translate(newstars[I].Position[0], 0.0, newstars[I].Position[0]);
+            tf->Scale(1.0, 1.0, 1.0);
+            tf->RotateY(90.0);
+            vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
+            tfpd->SetTransform(tf);
+            tfpd->SetInputData(AxiSymStar);
+            tfpd->Update();
+            tf->Delete();
+            AxiSymStar->Delete();
+            this->Stars.push_back(tfpd->GetOutput());
+            }
+          J++;
+          }
+        } // do this for all stars
+      }
+    H5Gclose(StarsDS);
+    }
+ // end of new-style star after November 6, 2008
+
+  if(interactions)
+    delete [] interactions;
+  if(models)
+    delete [] models;
+  if(stars)
+    delete [] stars;
+  H5Gclose(models_root_id);
+
+  H5Gclose(apr_root_id);
+  H5Fclose(this->file_id);
+  this->file_id = 0;
+
+  H5Eset_auto2(H5E_DEFAULT, func, client_data);
+  //cerr << "exitBuildStars() with " << this->NumberOfSphericallySymmetricStars << " spheric-symmetric stars, and " << this->NumberOfAxisSymmetricStars << " axis-symmetric stars\n";
+
+  return nb_stars;
+}
+
 VTK_ABI_NAMESPACE_END

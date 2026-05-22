@@ -9,10 +9,12 @@
 #include "vtkUniformGrid.h"
 
 #include "vtkPointData.h"
+#include "vtkPolyData.h"
 #include "vtkDataSet.h"
 #include "vtkDoubleArray.h"
 #include "vtkFloatArray.h"
 #include "vtkInformation.h"
+#include "vtkInformationVector.h"
 #include "vtkIntArray.h"
 #include "vtkLongArray.h"
 #include "vtkLongLongArray.h"
@@ -48,14 +50,14 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
 
   this->SetNumberOfInputPorts(0);
   this->LengthScaleFactor = 1e13; // bogus
-#ifdef MULTI_PORTS
+
   this->SetNumberOfOutputPorts(2);
 // this is for port number 1 which we do in all cases.
   vtkMultiBlockDataSet *pd = vtkMultiBlockDataSet::New();
   pd->ReleaseData();
   this->GetExecutive()->SetOutputData(1, pd);
   pd->Delete();
-#endif
+
   this->IsReady = false;
 // this is for port number 1 which we do in all cases.
   this->Internal = new vtkAMRAmazeReaderInternal();
@@ -74,6 +76,41 @@ vtkAMRAmazeReader::~vtkAMRAmazeReader()
   //this->PointDataArraySelection->Delete();
   delete this->Internal;
 }
+
+int vtkAMRAmazeReader::FillOutputPortInformation(int port, vtkInformation* info)
+{
+  if(port == 0)
+    info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkOverlappingAMR");
+  if(port == 1)
+    info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkMultiBlockDataSet");
+  return 1;
+}
+
+int vtkAMRAmazeReader::RequestData(vtkInformation* request,
+                  vtkInformationVector** inputVector,
+                  vtkInformationVector* outputVector)
+{
+  int status = vtkAMRBaseReader::RequestData(request, inputVector, outputVector);
+  
+  // the second output holds the Stars Polydata
+  vtkInformation* info = outputVector->GetInformationObject(1);
+  vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
+  if(1) // only MPI task 0 reads the stars
+  {
+    int local_nb_stars = vtkAMRAmazeReader::LoadStars(output2);
+    if(local_nb_stars != this->nbstars)
+    {
+      std::cerr << "something went wrong counting stars\n";
+      std::cerr << __LINE__ << "nb_stars = " << local_nb_stars << endl;
+    }
+  }
+  else
+  {
+    for(auto i=0; i < this->nbstars; i++)
+      output2->SetBlock(i, nullptr);
+  }
+  return status;
+};
 
 vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname )
 {
@@ -270,3 +307,26 @@ void vtkAMRAmazeReader::SetUpDataArraySelections()
   this->Internal->MakeVariableNames();
 }
 
+int vtkAMRAmazeReader::LoadStars(vtkMultiBlockDataSet* SpherSymStars)
+{
+  this->Internal->BuildStars();
+  int nb_stars = this->Internal->NumberOfSphericallySymmetricStars + this->Internal->NumberOfAxisSymmetricStars;
+  for(auto i=0; i < nb_stars; i++)
+  {
+    SpherSymStars->SetBlock(i, this->Internal->Stars[i]);
+    SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->Internal->Stars[i]->GetFieldData()->GetArray(0)->GetName());
+  }
+
+  return nb_stars;
+}
+
+// Get the second output which contains the stars
+//vtkPolyData* vtkAMRAmazeReader::GetStarsOutput()
+vtkMultiBlockDataSet* vtkAMRAmazeReader::GetStarsOutput()
+{
+  if (this->GetNumberOfOutputPorts() < 3)
+  {
+    return nullptr;
+  }
+  return vtkMultiBlockDataSet::SafeDownCast(this->GetExecutive()->GetOutputData(2));
+}

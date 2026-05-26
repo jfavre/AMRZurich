@@ -1,7 +1,7 @@
 <ServerManagerConfiguration>
   <!-- ================================================== -->
-  <ProxyGroup name="sources">
-    <SourceProxy class="vtkAMRAmazeReader"
+  <ProxyGroup name="internal_sources">
+    <Proxy class="vtkAMRAmazeReader"
            label="AMAZE AMR Reader"
            name="AMAZEReaderCore">
       <OutputPort index="0"
@@ -12,12 +12,13 @@
                             command="SetFileName"
                             name="FileName"
                             number_of_elements="1"
-                            >
+                            panel_visibility="never">
         <FileListDomain name="files"/>
         <Documentation>
           This property specifies the file name for the AMAZE reader.
         </Documentation>
       </StringVectorProperty>
+      
       <!-- Display the number of levels -->
       <IntVectorProperty command="GetNumberOfLevels"
                          information_only="1"
@@ -120,7 +121,61 @@
           </RequiredProperties>
        </ArraySelectionDomain>
      </StringVectorProperty>
-     
+
+    </Proxy>
+    <!-- end of "internal_sources" -->
+  </ProxyGroup>
+  <!-- ================================================== -->
+  
+  <ProxyGroup name="sources">
+    <SourceProxy class="vtkAMAZEFileSeriesReader"
+                 file_name_method="SetFileName"
+                 label="AMAZE Reader"
+                 name="AMAZEReader"
+                 si_class="vtkSIMetaReaderProxy">
+      <Documentation long_help="Reads HDF5 AMAZE files"
+                     short_help="Read HDF5 AMAZE data.">
+                     </Documentation>
+      <OutputPort index="0"
+                  name="AMR"/>
+      <OutputPort index="1"
+                  name="Stars"/>
+      <SubProxy>
+        <Proxy name="Reader"
+               proxygroup="internal_sources"
+               proxyname="AMAZEReaderCore"/>
+        <ExposedProperties>
+          <Property name="PointArrayInfo"/>
+          <Property name="PointArrayStatus"/>
+          <Property name="NumLevels"/>
+          <Property name="NumBlocks"/>
+          <Property name="EnableCaching"/>
+          <Property name="Level"/>
+          <Property name="LogData"/>
+          <Property name="ShiftedGrid"/>
+          <Property name="LengthScale"/>
+          <Property name="BoxLength"/>
+        </ExposedProperties>
+      </SubProxy>
+
+      <StringVectorProperty command="GetCurrentFileName"
+                            information_only="1"
+                            name="FileNameInfo">
+        <SimpleStringInformationHelper />
+      </StringVectorProperty>
+      <StringVectorProperty animateable="0"
+                            clean_command="RemoveAllFileNames"
+                            command="AddFileName"
+                            name="FileNames"
+                            number_of_elements="0"
+                            panel_visibility="never"
+                            repeat_command="1">
+        <FileListDomain name="files" />
+        <Documentation>
+          The list of files to be read by the reader.
+        </Documentation>
+      </StringVectorProperty>
+
       <DoubleVectorProperty information_only="1"
                             name="TimestepValues"
                             repeatable="1">
@@ -129,7 +184,7 @@
           Available timestep values.
         </Documentation>
       </DoubleVectorProperty>
-
+      
       <Hints>
         <ReaderFactory extensions="amr5"
                        file_description="HDF5 AMAZE files" />

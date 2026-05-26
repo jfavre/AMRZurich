@@ -146,7 +146,14 @@ int vtkAMRAmazeReader::RequestInformation(
     outputVector->GetInformationObject(0)->Set(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA(), output);
   else
     outputVector->GetInformationObject(0)->Remove(vtkCompositeDataPipeline::COMPOSITE_DATA_META_DATA());
-
+  
+  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
+  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
+  double localTime = this->Internal->AMAZETime;
+  double timeRange[2] = {localTime, localTime};
+  info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
+  info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
+  
   return 1;
 } // end of ExecuteInformation
 
@@ -157,16 +164,6 @@ void vtkAMRAmazeReader::FillMetaData(vtkOverlappingAMR *output)
 
   this->LevelRange[0] = 0;
   this->LevelRange[1] = this->Internal->NumberOfLevels-1;
-
-  double localTime = this->GetTime();
-  //double timeRange[2] = {localTime, localTime};
-  //info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
-  //info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
-
-  //cerr << __LINE__ << "Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS() = " << localTime << "\n";
-  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
-  output->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
-  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
   
   this->SetUpDataArraySelections();
   
@@ -224,6 +221,7 @@ void vtkAMRAmazeReader::FillMetaData(vtkOverlappingAMR *output)
                 << "\nNumberOfLevels: " << this->GetNumberOfLevels()
                 << "\nNumberOfBlocks: " << this->GetNumberOfBlocks()
                 );
+/*
   double bb[6];             
   for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
   {
@@ -233,7 +231,7 @@ void vtkAMRAmazeReader::FillMetaData(vtkOverlappingAMR *output)
      std::cerr << "bb = [ " << bb[0] << ", " << bb[1] <<  ", " << bb[2] << ", "<<  bb[3] << ", " << bb[4] <<  ", " << bb[5] << "]\n";
     }
   }
-
+*/
 }  // FillMetaData()
 
 //------------------------------------------------------------------------------
@@ -303,7 +301,6 @@ int vtkAMRAmazeReader::RequestData(
   
   double requestedTime = info->Get(vtkStreamingDemandDrivenPipeline::UPDATE_TIME_STEP());
   cout << __LINE__ << ": requestedTime = " << requestedTime << endl;
-  int length = info->Length(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
 
   bool has_block_requests =
     info->Has(vtkCompositeDataPipeline::LOAD_REQUESTED_BLOCKS()) != 0;

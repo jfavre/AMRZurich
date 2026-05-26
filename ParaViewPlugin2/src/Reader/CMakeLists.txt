@@ -1,5 +1,6 @@
 set(classes
   vtkAMRAmazeReader
+  vtkAMAZEFileSeriesReader
   )
 set(private_classes
   vtkAMRAmazeReaderInternal

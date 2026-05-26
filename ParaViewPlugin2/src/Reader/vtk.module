@@ -7,7 +7,6 @@ DEPENDS
   VTK::CommonCore
   VTK::CommonExecutionModel
   VTK::CommonDataModel
-  VTK::CommonMisc
   VTK::CommonSystem
   VTK::hdf5
   VTK::FiltersCore
@@ -21,7 +20,10 @@ DEPENDS
   VTK::IOAMR
   VTK::RenderingCore
   VTK::RenderingOpenGL2
-  VTK::TestingCore
 
 PRIVATE_DEPENDS
   VTK::vtksys
+  VTK::CommonMisc
+TEST_DEPENDS
+  VTK::TestingCore
+  VTK::TestingRendering

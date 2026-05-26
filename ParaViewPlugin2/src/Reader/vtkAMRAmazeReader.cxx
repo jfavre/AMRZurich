@@ -86,12 +86,33 @@ int vtkAMRAmazeReader::FillOutputPortInformation(int port, vtkInformation* info)
   return 1;
 }
 
+int vtkAMRAmazeReader::RequestInformation(vtkInformation* request,
+                  vtkInformationVector** inputVector,
+                  vtkInformationVector* outputVector)
+{
+  vtkInformation* info = outputVector->GetInformationObject(0);
+  
+  int status = vtkAMRBaseReader::RequestInformation(request, inputVector, outputVector);
+  
+  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
+  info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
+  double localTime = this->Internal->AMAZETime;
+  double timeRange[2] = {localTime, localTime};
+  info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
+  info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
+  
+  return status;
+}
+
 int vtkAMRAmazeReader::RequestData(vtkInformation* request,
                   vtkInformationVector** inputVector,
                   vtkInformationVector* outputVector)
 {
   int status = vtkAMRBaseReader::RequestData(request, inputVector, outputVector);
-  
+    
+  double localTime = this->Internal->AMAZETime;
+  this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
+    
   // the second output holds the Stars Polydata
   vtkInformation* info = outputVector->GetInformationObject(1);
   vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
@@ -215,9 +236,6 @@ int vtkAMRAmazeReader::GetNumberOfLevels()
 int vtkAMRAmazeReader::FillMetaData()
 {
   this->nbstars = this->Internal->ReadMetaData();
-
-  double localTime = this->Internal->AMAZETime;
-  this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
 
   this->SetUpDataArraySelections();
 

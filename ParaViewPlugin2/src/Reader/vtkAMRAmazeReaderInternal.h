@@ -10,12 +10,7 @@
 #ifndef vtkAMRAmazeReaderInternal_h
 #define vtkAMRAmazeReaderInternal_h
 
-#include <cassert>
-#include <cstring>
-#include <map>
-#include <string>
-#include <vector>
-
+#include "vtkAMRBox.h"
 #include "vtkByteSwap.h"
 #include "vtkCellData.h"
 #include "vtkDataArray.h"
@@ -24,8 +19,19 @@
 #include "vtkIntArray.h"
 #include "vtkObject.h"
 #include "vtkSetGet.h"
-
 #include "vtk_hdf5.h"
+
+#include <cassert>
+#include <cstring>
+#include <map>
+#include <string>
+#include <vector>
+#include <stddef.h>
+
+class vtkPolyData;
+class vtkUniformGrid;
+class vtkRectilinearGrid;
+class vtkStructuredGrid;
 
 class vtkPolyData;
 class vtkUniformGrid;
@@ -33,19 +39,27 @@ class vtkRectilinearGrid;
 class vtkStructuredGrid;
 class vtkDoubleArray;
 class vtkDataArray;
-enum ScaleOption {pc=0, AU, RSun, NoScale};
-enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres};
 
-#include <stddef.h>
+enum class ScaleType : int
+{
+  pc = 0,
+  AU = 1,
+  RSun = 2,
+  NoScale = 3
+};
+  
+enum class MapName : int
+{
+  NoMap = 0,
+  Sphere_LogR = 1,
+  DCR_Cart2Spheres = 2
+};
 
-#include "vtkObject.h"
-#include "vtkAMRBox.h"
-
-#define adG_MAXDIM		3	  // maximum number of dimensions
-#define adG_NAMELENGTH	400	  // maximum length of a name string
-#define adG_PATHLENGTH	1024  // maximum length of a path string
-#define adG_LABELLENGTH	64	  // maximum length of a label string
-#define adG_UNITLENGTH	32	  // maximum length of a unit string
+constexpr int adG_MAXDIM = 3;         // maximum number of dimensions
+constexpr int adG_NAMELENGTH = 400;   // maximum length of a name string
+constexpr int adG_PATHLENGTH = 1024;  // maximum length of a path string
+constexpr int adG_LABELLENGTH = 64;   // maximum length of a label string
+constexpr int adG_UNITLENGTH = 32;    // maximum length of a unit string
 
 #define adG_BINARY		0
 #define adG_ASCII		1
@@ -171,7 +185,7 @@ public:
                                  struct AxiSymStarCurrent *axiStarData,
                                  int AngleResolution);
   
-  ScaleOption            ScaleChoice;
+  ScaleType            ScaleChoice;
 
   int NumberOfLevels;
   int NumberOfComponents;
@@ -192,16 +206,16 @@ public:
   std::map<std::string, std::string> PVlabels;
   void ReadHDF5GridsMetaData(bool);
   void MakeVariableNames();
-  bool LengthScale; // will automatically scale the grids to real length
-  double LengthScaleFactor;
+  vtkTypeBool LengthScale{1}; // will automatically scale the grids to real length
+  double LengthScaleFactor{1.0};
   int Dimensionality;
 
   int GridsPerLevels(int l){ return this->Levels[l].GridsPerLevel; };
   
 protected:
-  hid_t file_id;
-  char* FileName = nullptr;
-  bool LogData; // will automatically calculate log10() for Density, Temperature and Pressure
+  hid_t file_id{0};
+  char* FileName{nullptr};
+  vtkTypeBool LogData{0}; // will automatically calculate log10() for Density, Temperature and Pressure
 
   int DataScale;
 

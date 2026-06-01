@@ -1,4 +1,3 @@
-
 /**
  * @class   vtkAMRAmazeReader
  * @brief   A concrete instance of vtkAMRBaseReader that implements functionality
@@ -10,6 +9,7 @@
 
 #include "vtkAMRBaseReader.h"
 #include "vtkIOAMRModule.h" // For export macro
+#include <memory> // For std::unique_ptr
 
 class vtkOverlappingAMR;
 class vtkAMRAmazeReaderInternal;
@@ -22,60 +22,48 @@ public:
   vtkTypeMacro(vtkAMRAmazeReader, vtkAMRBaseReader);
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
+  //--- Grid Shift Settings ---
   vtkSetMacro(ShiftedGrid, vtkTypeBool);
   vtkGetMacro(ShiftedGrid, vtkTypeBool);
   vtkBooleanMacro(ShiftedGrid, vtkTypeBool);
 
+  //--- Data Logarithmic Scaling Settings ---
   vtkSetMacro(LogData, vtkTypeBool);
   vtkGetMacro(LogData, vtkTypeBool);
   vtkBooleanMacro(LogData, vtkTypeBool);
 
+  //--- Scale Choice Settings ---
   vtkSetMacro(ScaleChoice, int);
   vtkGetMacro(ScaleChoice, int);
 
+  //--- Length Scaling Settings ---
   vtkSetMacro(LengthScale, vtkTypeBool);
   vtkGetMacro(LengthScale, vtkTypeBool);
   vtkBooleanMacro(LengthScale, vtkTypeBool);
 
-  vtkSetMacro(LengthScaleFactor, double);
-  vtkGetMacro(LengthScaleFactor, double);
-
+  //--- Data Scaling Settings ---
   vtkSetMacro(DataScale, vtkTypeBool);
   vtkGetMacro(DataScale, vtkTypeBool);
-  vtkBooleanMacro(DataScale, vtkTypeBool)
+  vtkBooleanMacro(DataScale, vtkTypeBool);
 
-  /**
-   * See vtkAMRBaseReader::GetNumberOfBlocks
-   */
+  //--- Overridden Base Reader API ---
   int GetNumberOfBlocks() override;
-
-  /**
-   * See vtkAMRBaseReader::GetNumberOfLevels
-   */
   int GetNumberOfLevels() override;
-
-  /**
-   * See vtkAMRBaseReader::SetFileName
-   */
   void SetFileName(VTK_FILEPATH const char* fileName) override;
+
+  //--- Amaze Specific API ---
   vtkMultiBlockDataSet* GetStarsOutput();
-  int LoadStars(vtkMultiBlockDataSet*);
-  vtkTypeBool CanReadFile(VTK_FILEPATH const char* fname);
-  
-  vtkTypeBool LogData; // will automatically calculate log10() for Density, Temperature and Pressure
-  vtkTypeBool LengthScale; // will automatically scale the grids to real length
-  vtkTypeBool ShiftedGrid; //will use the shifter grid to provide stationary slab animation
-  int ScaleChoice;
-  vtkTypeBool DataScale;
-  double LengthScaleFactor;
-  
+  int LoadStars(vtkMultiBlockDataSet* starsDataSet);
+  vtkTypeBool CanReadFile(VTK_FILEPATH const char* fname) const;
+
 protected:
   vtkAMRAmazeReader();
   ~vtkAMRAmazeReader() override;
 
+  //--- Pipeline Methods ---
   int RequestInformation(vtkInformation* request,
-                  vtkInformationVector** inputVector,
-                  vtkInformationVector* outputVector) override;
+                         vtkInformationVector** inputVector,
+                         vtkInformationVector* outputVector) override;
                   
   int RequestData(vtkInformation* request,
                   vtkInformationVector** inputVector,
@@ -83,52 +71,32 @@ protected:
                   
   int FillOutputPortInformation(int port, vtkInformation* info) override;
   
-  
-  /**
-   * See vtkAMRBaseReader::ReadMetaData
-   */
+  //--- Metadata and Grid Parsing ---
   void ReadMetaData() override;
-
-  /**
-   * See vtkAMRBaseReader::GetBlockLevel
-   */
   int GetBlockLevel(int blockIdx) override;
-
-  /**
-   * See vtkAMRBaseReader::FillMetaData
-   */
   int FillMetaData() override;
 
-  /**
-   * See vtkAMRBaseReader::GetAMRGrid
-   */
   vtkUniformGrid* GetAMRGrid(int blockIdx) override;
-
-  /**
-   * See vtkAMRBaseReader::GetAMRGridData
-   */
-    void GetAMRGridData(int vtkNotUsed(blockIdx), vtkUniformGrid* vtkNotUsed(block),const char* vtkNotUsed(field)) override {};
- 
-  /**
-   * See vtkAMRBaseReader::GetAMRGridData
-   */
+  void GetAMRGridData(int vtkNotUsed(blockIdx), vtkUniformGrid* vtkNotUsed(block), const char* vtkNotUsed(field)) override {}
   void GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field) override;
-  /**
-   * See vtkAMRBaseReader::SetUpDataArraySelections
-   */
   void SetUpDataArraySelections() override;
 
+  //--- Internal State Variables ---
+  vtkTypeBool LogData{0};          // Calculates log10() for Density, Temperature and Pressure
+  vtkTypeBool LengthScale;      // Scales the grids to real length
+  vtkTypeBool ShiftedGrid{0};      // Uses shifted grid to provide stationary slab animation
+  vtkTypeBool DataScale;
+  int ScaleChoice;
+
   bool IsReady;
-
   unsigned int MaximumLevelsToReadByDefault;
-
   int nbstars;
 
 private:
   vtkAMRAmazeReader(const vtkAMRAmazeReader&) = delete;
   void operator=(const vtkAMRAmazeReader&) = delete;
 
-  vtkAMRAmazeReaderInternal* Internal;
+  std::unique_ptr<vtkAMRAmazeReaderInternal> Internal;
 };
 
 #endif /* vtkAMRAmazeReader_h */

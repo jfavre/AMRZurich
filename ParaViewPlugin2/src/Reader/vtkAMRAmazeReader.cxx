@@ -41,15 +41,14 @@ vtkStandardNewMacro(vtkAMRAmazeReader);
 vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
   this->nbstars = 0;
-  this->LogDataOn();
+
   this->DataScaleOn();
-  this->ShiftedGridOff();
+
   //if(this->PointDataArraySelection == nullptr)
     //this->PointDataArraySelection = vtkDataArraySelection::New();
   this->DebugOff();
 
   this->SetNumberOfInputPorts(0);
-  this->LengthScaleFactor = 1e13; // bogus
 
   this->SetNumberOfOutputPorts(2);
 // this is for port number 1 which we do in all cases.
@@ -60,7 +59,7 @@ vtkAMRAmazeReader::vtkAMRAmazeReader()
 
   this->IsReady = false;
 // this is for port number 1 which we do in all cases.
-  this->Internal = new vtkAMRAmazeReaderInternal();
+  this->Internal = std::make_unique<vtkAMRAmazeReaderInternal>();
   this->Initialize();
 }
 
@@ -72,9 +71,6 @@ vtkAMRAmazeReader::~vtkAMRAmazeReader()
     delete [] this->FileName;
     this->FileName = nullptr;
     }
-
-  //this->PointDataArraySelection->Delete();
-  delete this->Internal;
 }
 
 int vtkAMRAmazeReader::FillOutputPortInformation(int port, vtkInformation* info)
@@ -133,7 +129,7 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
   return status;
 };
 
-vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname )
+vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname ) const
 {
   if (! fname )
     return false;
@@ -259,7 +255,6 @@ int vtkAMRAmazeReader::FillMetaData()
   {
     this->Internal->GetSpacing(levelId, spacing);
     this->Metadata->SetSpacing(levelId, spacing);
-
     if (levelId == this->GetNumberOfLevels() - 1)  // we are at finest level of refinement
     {
       refratio = 1;

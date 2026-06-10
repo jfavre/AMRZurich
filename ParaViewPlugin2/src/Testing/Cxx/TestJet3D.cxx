@@ -30,9 +30,9 @@ VTK_MODULE_INIT(vtkInteractionStyle);
 #include "vtkTIFFWriter.h"
 #include "vtkTimerLog.h"
 #include "vtkWindowToImageFilter.h"
-#include "vtkTestUtilities.h"
-#include "vtkXMLHierarchicalBoxDataReader.h"
-#include "vtkXMLHierarchicalBoxDataWriter.h"
+//#include "vtkTestUtilities.h"
+//#include "vtkXMLHierarchicalBoxDataReader.h"
+//#include "vtkXMLHierarchicalBoxDataWriter.h"
 
 #include <iostream>
 using namespace std;

@@ -109,6 +109,11 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
   double localTime = this->Internal->AMAZETime;
   this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
     
+  // the first output holds the AMR structure
+  vtkInformation* info0 = outputVector->GetInformationObject(0);
+  vtkOverlappingAMR* amr = vtkOverlappingAMR::SafeDownCast(info0->Get(vtkDataObject::DATA_OBJECT()));
+  bool res = amr->CheckValidity();
+
   // the second output holds the Stars Polydata
   vtkInformation* info = outputVector->GetInformationObject(1);
   vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));

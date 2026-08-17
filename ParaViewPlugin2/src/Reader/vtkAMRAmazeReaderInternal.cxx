@@ -13,12 +13,13 @@
 #include "vtkPointData.h"
 #include "vtkPoints.h"
 #include "vtkPolyData.h"
+#include "vtkPointSet.h"
 #include "vtkRectilinearGrid.h"
 #include "vtkSphereSource.h"
 #include "vtkStringArray.h"
 #include "vtkStructuredGrid.h"
 #include "vtkTransform.h"
-#include "vtkTransformPolyDataFilter.h"
+#include "vtkTransformFilter.h"
 #include "vtkUniformGrid.h"
 
 #include <algorithm>
@@ -1448,13 +1449,13 @@ int vtkAMRAmazeReaderInternal::BuildStars()
             tf->Translate(0.0, 0.0, 0.0);
             tf->Scale(1.0, 1.0, 1.0);
             tf->RotateX(90.0);
-            vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
+            vtkTransformFilter *tfpd = vtkTransformFilter::New();
             tfpd->SetTransform(tf);
             tfpd->SetInputData(AxiSymStar);
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
-            this->Stars.push_back(tfpd->GetOutput());
+            this->Stars.push_back(tfpd->GetPolyDataOutput());
             }
           else if(AxisDirection == 2)
             {
@@ -1462,13 +1463,13 @@ int vtkAMRAmazeReaderInternal::BuildStars()
             tf->Translate(newstars[I].Position[0], 0.0, newstars[I].Position[0]);
             tf->Scale(1.0, 1.0, 1.0);
             tf->RotateY(90.0);
-            vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
+            vtkTransformFilter *tfpd = vtkTransformFilter::New();
             tfpd->SetTransform(tf);
             tfpd->SetInputData(AxiSymStar);
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
-            this->Stars.push_back(tfpd->GetOutput());
+            this->Stars.push_back(tfpd->GetPolyDataOutput());
             }
           J++;
           }

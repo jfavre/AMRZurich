@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
 // SPDX-License-Identifier: BSD-3-Clause
 #include "vtkAMRAmazeReader.h"
-#include "vtkAMRBox.h"
-#include "vtkByteSwap.h"
 #include "vtkDataArraySelection.h"
 #include "vtkObjectFactory.h"
 #include "vtkOverlappingAMR.h"
@@ -10,21 +8,11 @@
 
 #include "vtkPointData.h"
 #include "vtkPolyData.h"
-#include "vtkDataSet.h"
 #include "vtkDoubleArray.h"
-#include "vtkFloatArray.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
-#include "vtkIntArray.h"
-#include "vtkLongArray.h"
-#include "vtkLongLongArray.h"
-#include "vtkNew.h"
 #include "vtkMultiBlockDataSet.h"
-#include "vtkShortArray.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkUnsignedCharArray.h"
-#include "vtkUnsignedIntArray.h"
-#include "vtkUnsignedShortArray.h"
 
 #include <algorithm>
 #include <cassert>

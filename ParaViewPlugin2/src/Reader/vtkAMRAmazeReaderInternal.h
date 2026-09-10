@@ -11,14 +11,7 @@
 #define vtkAMRAmazeReaderInternal_h
 
 #include "vtkAMRBox.h"
-#include "vtkByteSwap.h"
-#include "vtkCellData.h"
-#include "vtkDataArray.h"
-#include "vtkDataSet.h"
 #include "vtkDoubleArray.h"
-#include "vtkIntArray.h"
-#include "vtkObject.h"
-#include "vtkSetGet.h"
 #include "vtk_hdf5.h"
 
 #include <cassert>
@@ -33,12 +26,7 @@ class vtkUniformGrid;
 class vtkRectilinearGrid;
 class vtkStructuredGrid;
 
-class vtkPolyData;
-class vtkUniformGrid;
-class vtkRectilinearGrid;
-class vtkStructuredGrid;
 class vtkDoubleArray;
-class vtkDataArray;
 
 enum class ScaleType : int
 {

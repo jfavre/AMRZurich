@@ -1,0 +1,58 @@
+"""
+Test for AMAZEReader plugin demonstrating vtkFileSeriesReader
+with multiple output ports.
+
+This test verifies:
+1. Reader loads and produces 2 output ports
+2. vtkFileSeriesReader correctly detects output port count
+3. Reader has the correct tmestepvalues
+"""
+
+import os
+import sys
+from pathlib import Path
+
+from paraview.simple import *
+import paraview.util
+
+# Load the plugin (path configured by CMake generator expression)
+plugin_path = r"$<TARGET_FILE:pvAMAZEReader2>"
+print(f"Loading plugin from: {plugin_path}")
+LoadPlugin(plugin_path, remote=False, ns=globals())
+
+# Find data directory (set via PARAVIEW_DATA_ROOT environment variable)
+data_dir = str(Path(os.environ["PARAVIEW_DATA_ROOT"]))
+pattern = "/DATA.*.amr5"
+fnames = paraview.util.Glob(path=data_dir+pattern)
+
+if len(fnames) == 0:
+    print(f"ERROR: No .amr5 test files found in {data_dir}")
+    sys.exit(1)
+
+print(f"Found {len(fnames)} test files in {data_dir}")
+
+# Create reader with file series
+reader = AMAZEReader(FileNames=fnames)
+reader.UpdatePipeline()
+
+# Get the underlying VTK object
+vtk_reader = reader.GetClientSideObject()
+output0 = vtk_reader.GetOutputDataObject(0)
+output1 = vtk_reader.GetOutputDataObject(1)
+
+# Test 1: Verify 2 output ports
+num_ports = vtk_reader.GetNumberOfOutputPorts()
+print(f"Output ports: {num_ports}")
+assert num_ports == 2, f"Expected 2 output ports, got {num_ports}"
+
+# Test 2: Verify time steps
+time_steps = list(reader.TimestepValues)
+print(f"{len(time_steps)} time steps: ", reader.TimestepValues) 
+assert len(time_steps) == len(fnames), f"Expected {len(fnames)} time steps, got {len(time_steps)}"
+
+# Test 4: Verify distinct arrays on each port
+print(f"AMR tree has {output0.GetNumberOfBlocks()} blocks")
+assert 2 == output1.GetNumberOfBlocks(), f"Expected 2 Stars , got {output1.GetNumberOfBlocks()}"
+
+print("\n=== ALL TESTS PASSED ===")
+

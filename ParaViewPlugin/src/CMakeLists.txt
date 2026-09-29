@@ -1,4 +1,3 @@
-#ADD_DEFINITIONS(-DH5_USE_16_API)
 paraview_add_plugin(pvAMAZEReader
   REQUIRED_ON_SERVER
   VERSION "1.0"

@@ -1,44 +1,33 @@
+
 #include "vtkAMRAmazeReaderInternal.h"
 
 #include "vtkAMRBox.h"
-#include "vtkCellArray.h"
 #include "vtkCharArray.h"
-
-#include "vtkDataSetAttributes.h"
 #include "vtkDoubleArray.h"
 #include "vtkErrorCode.h"
-#include "vtkFloatArray.h"
-#include "vtkMath.h"
 #include "vtkNew.h"
-
 #include "vtkPointData.h"
-#include "vtkPoints.h"
 #include "vtkPolyData.h"
-#include "vtkRectilinearGrid.h"
 #include "vtkSphereSource.h"
 #include "vtkStringArray.h"
-#include "vtkStructuredGrid.h"
 #include "vtkTransform.h"
-#include "vtkTransformPolyDataFilter.h"
+#include "vtkTransformFilter.h"
 #include "vtkUniformGrid.h"
 
-#include <stdio.h>
-#include <math.h>
-#include <stddef.h>
-
-//#define SINGLE_OUTPUT_PORT 1
-//#define PARALLEL_DEBUG 1
-
-#include <vector>
-#include <string>
-#include <map>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstddef>
 #include <format>
 #include <iostream>
+#include <map>
 #include <sstream>
+#include <string>
+#include <vector>
 
-using namespace std;
+VTK_ABI_NAMESPACE_BEGIN
 
-typedef struct interaction
+struct interaction
 {
   int StarNumber;
   int NTIME;
@@ -47,7 +36,32 @@ typedef struct interaction
   double MassLoss;
   double VInf;
   double Temp;
-} interaction;
+};
+
+struct model
+{
+  char Model[20];
+  char ModelFileName[20];
+  char IntActType[20];
+  char IntActModel[20];
+  char IModelFileName[20];
+  int NTime;
+  int NTimePos;
+};
+
+struct star
+{
+  char   Type[20];
+  double Position[3];
+  double Velocity[3];
+  double Radius;
+  double Mass;
+  double Temperature;
+  double Luminosity;
+  double Rotation[3];
+  double BField[3];
+  char   Interaction[20];
+};
 
 
 //----------------------------------------------------------------------------
@@ -57,37 +71,18 @@ static hid_t Create_Interaction_Compound()
 
   id = H5Tcreate(H5T_COMPOUND, sizeof(interaction));
 
-  H5Tinsert(id, "Star Number", HOFFSET(interaction, StarNumber),
-            H5T_NATIVE_INT);
-
-  H5Tinsert(id, "NTIME", HOFFSET(interaction, NTIME),
-		    H5T_NATIVE_INT);
-
-  H5Tinsert(id, "NAbund", HOFFSET(interaction, NAbund),
-            H5T_NATIVE_INT);
-
-  H5Tinsert(id, "CompRadius", 
-            HOFFSET(interaction, CompRadius), H5T_NATIVE_DOUBLE);
-  H5Tinsert(id, "MassLoss", 
-            HOFFSET(interaction, MassLoss), H5T_NATIVE_DOUBLE);
-  H5Tinsert(id, "VInf", 
-            HOFFSET(interaction, VInf), H5T_NATIVE_DOUBLE);
-  H5Tinsert(id, "Temp", 
-            HOFFSET(interaction, Temp), H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Star Number", HOFFSET(interaction, StarNumber), H5T_NATIVE_INT);
+  H5Tinsert(id, "NTIME", HOFFSET(interaction, NTIME), H5T_NATIVE_INT);
+  H5Tinsert(id, "NAbund", HOFFSET(interaction, NAbund), H5T_NATIVE_INT);
+  H5Tinsert(id, "CompRadius", HOFFSET(interaction, CompRadius), H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "MassLoss", HOFFSET(interaction, MassLoss), H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "VInf", HOFFSET(interaction, VInf), H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Temp", HOFFSET(interaction, Temp), H5T_NATIVE_DOUBLE);
 
   return id;
 };
 
-typedef struct model
-{
-  char Model[20];
-  char ModelFileName[20];
-  char IntActType[20];
-  char IntActModel[20];
-  char IModelFileName[20];
-  int NTime;
-  int NTimePos;
-} model;
+
 
 static hid_t Create_StarModel_Compound()
 {
@@ -142,19 +137,7 @@ static hid_t Create_NewStar_Compound()
   return id;
 };
 
-typedef struct star
-{
-  char   Type[20];
-  double Position[3];
-  double Velocity[3];
-  double Radius;
-  double Mass;
-  double Temperature;
-  double Luminosity;
-  double Rotation[3];
-  double BField[3];
-  char   Interaction[20];
-} star;
+
 
 static hid_t Create_Star_Compound()
 {
@@ -204,6 +187,7 @@ static hid_t Create_AxiSymStar_Compound()
 
   return id;
 }
+
 static hid_t Create_SpherSymStar_Compound()
 {
   hsize_t  dim[1];
@@ -222,244 +206,17 @@ static hid_t Create_SpherSymStar_Compound()
   return id;
 }
 
-vtkPolyData * vtkAMRAmazeReaderInternal::AxisSymStarSource(newstar *astar,
-                                      struct AxiSymStarCurrent *axiStarData,
-                                      int AngleResolution)
-{
-  vtkPolyData *AxiSymStar = vtkPolyData::New();
-
-  double Radius, Center[3];
-
-  if(this->LengthScale)
-    {
-    Radius = astar->CompRadiusFrac / this->LengthScaleFactor;
-    //Radius = astar->CompRadiusFrac * 6.96e10 / this->LengthScaleFactor;  
-    Center[0] = astar->Position[0];// / this->LengthScaleFactor;
-    Center[1] = astar->Position[1];// / this->LengthScaleFactor;
-    Center[2] = astar->Position[2];// / this->LengthScaleFactor;
-    }
-  else
-    {
-    Radius = astar->CompRadiusFrac;
-    //Radius = astar->CompRadiusFrac * 6.96e10;
-    Center[0] = astar->Position[0];
-    Center[1] = astar->Position[1];
-    Center[2] = astar->Position[2];
-    }
-
-  double Starttheta = 0.0;  // Rolf uses PI/2 for the North Pole, 
-  double Endtheta = 180.0;  //      and -PI/2 for South Pole
-  int LatLongTessellation = 0;
-  int numPts, numPolys;
-  vtkPoints *newPoints;
-  vtkFloatArray *newNormals;
-  vtkCellArray *newPolys;
-  double x[3], n[3], deltaphi, theta, phi, radius, norm;
-  int base, numPoles=0;
-  vtkIdType pts[4];
-
-  int thetaResolution = AngleResolution - 2;
-  int phiResolution = AngleResolution + 1;
-
-  numPts = thetaResolution * phiResolution + 2;
-  // creating triangles
-  numPolys = thetaResolution * 2 * phiResolution;
-  //cerr << "  numPts "             << numPts  << ", numPolys " << numPolys  << endl;
-  newPoints = vtkPoints::New();
-  newPoints->SetDataTypeToDouble();
-  newPoints->Allocate(numPts);
-  newNormals = vtkFloatArray::New();
-  newNormals->SetNumberOfComponents(3);
-  newNormals->Allocate(3*numPts);
-  newNormals->SetName("Normals");
-
-  newPolys = vtkCellArray::New();
-  newPolys->AllocateExact(numPolys, 3);
-
-  //cerr << "  Center "             << Center[0]  << ", " << Center[1]  << ", " << Center[2]  << endl;
-
-  // Create north pole
-  x[0] = Center[0];
-  x[1] = Center[1];
-  x[2] = Center[2] + Radius * axiStarData[0].Radius;
-  newPoints->InsertNextPoint(x);
-  //cerr << "North Pole at: "  << x[0]  << ", " << x[1]  << ", " << x[2]  << endl;
-  x[0] = x[1] = 0.0; x[2] = 1.0;
-  newNormals->InsertNextTuple(x);
-  numPoles++;
-
-    // Create south pole
-  x[0] = Center[0];
-  x[1] = Center[1];
-  x[2] = Center[2] - Radius * axiStarData[AngleResolution-1].Radius;
-  newPoints->InsertNextPoint(x);
-  //cerr << "South Pole at: "  << x[0]  << ", " << x[1]  << ", " << x[2]  << endl;
-  x[0] = x[1] = 0.0; x[2] = -1.0;
-  newNormals->InsertNextTuple(x);
-  numPoles++;
-
-  deltaphi = (2.0 * M_PI) / phiResolution;
-  //cerr << "loop "  << phiResolution << " around the Z axis"<< endl;
-  // Create intermediate points
-  for (int i=0; i < phiResolution; i++)
-    {
-    phi = i * deltaphi;
-    //cerr << i << " phi = " << phi << endl;
-    for (int j=1; j< AngleResolution-1; j++)
-      {
-      theta = M_PI_2 - axiStarData[j].Theta; // theta should range between 0 and M_PI
-      //if(i==0) cerr << theta << endl;
-      radius = Radius * axiStarData[j].Radius;
-      n[0] = radius * cos((double)phi) * sin((double)theta);
-      n[1] = radius * sin((double)phi)* sin((double)theta);
-      n[2] = radius * cos((double)theta);
-      x[0] = n[0] + Center[0];
-      x[1] = n[1] + Center[1];
-      x[2] = n[2] + Center[2];
-      newPoints->InsertNextPoint(x);
-
-      if ( (norm = vtkMath::Norm(n)) == 0.0 )
-        {
-        norm = 1.0;
-        }
-      n[0] /= norm; n[1] /= norm; n[2] /= norm;
-      newNormals->InsertNextTuple(n);
-      }
-    }
-
-   // Generate mesh connect  H5Eset_auto(func, client_data);ivity
-   base = thetaResolution * phiResolution;
-
-   // around north pole
-  for (int i=0; i < phiResolution; i++)
-   {
-   pts[0] = thetaResolution*i + numPoles;
-   pts[1] = (thetaResolution*(i+1) % base) + numPoles;
-   pts[2] = 0;
-   newPolys->InsertNextCell(3, pts);
-   }
-
-// around south pole
-   int numOffset = thetaResolution - 1 + numPoles;
-
-  for (int i=0; i < phiResolution; i++)
-    {
-    pts[0] = thetaResolution*i + numOffset;
-    pts[2] = ((thetaResolution*(i+1)) % base) + numOffset;
-    pts[1] = numPoles - 1;
-    newPolys->InsertNextCell(3, pts);
-    }
-
-  // bands in-between poles
-  for (int i=0; i < phiResolution; i++)
-    {
-    for (int j=0; j < (thetaResolution-1); j++)
-      {
-      pts[0] = thetaResolution*i + j + numPoles;
-      pts[1] = pts[0] + 1;
-      pts[2] = ((thetaResolution*(i+1)+j) % base) + numPoles + 1;
-      if ( !LatLongTessellation )
-         {
-         newPolys->InsertNextCell(3, pts);
-         pts[1] = pts[2];
-         pts[2] = pts[1] - 1;
-         newPolys->InsertNextCell(3, pts);
-         }
-      else
-        {
-        pts[3] = pts[2] - 1;
-        newPolys->InsertNextCell(4, pts);
-        }
-      }
-    }
-
-  newPoints->Squeeze();
-  AxiSymStar->SetPoints(newPoints);
-  newPoints->Delete();
-
-  newNormals->Squeeze();
-  //AxiSymStar->GetPointData()->SetNormals(newNormals);
-  newNormals->Delete();
-
-  newPolys->Squeeze();
-  AxiSymStar->SetPolys(newPolys);
-  newPolys->Delete();
-
-// now the data
-  vtkDoubleArray *Temperature = vtkDoubleArray::New();
-  Temperature->SetNumberOfComponents(1);
-  Temperature->SetNumberOfTuples((AngleResolution-2) * (AngleResolution + 1) + 2);
-  Temperature->SetName("Temperature");
-  Temperature->SetName((const char*)PVlabels["Temperature"].c_str());
-  AxiSymStar->GetPointData()->AddArray(Temperature);
-  int p0=0;
-  Temperature->SetValue(p0++, axiStarData[0].Temperature);
-  Temperature->SetValue(p0++, axiStarData[AngleResolution-1].Temperature);
-  for(int p1=0; p1 < (AngleResolution + 1); p1++)
-    {
-    for(int p2=1; p2 < AngleResolution-1; p2++)
-      {
-      Temperature->SetValue(p0++, axiStarData[p2].Temperature);
-      }
-    }
-  if(this->LogData)
-    {
-     for(int p1=0; p1 < Temperature->GetNumberOfTuples(); p1++)
-       {
-       Temperature->SetValue(p1, log10(Temperature->GetValue(p1)));
-       }
-    }
-  Temperature->Delete();
-
-  //vtkDoubleArray *mass = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> mass;
-  mass->SetNumberOfComponents(1);
-  mass->SetNumberOfTuples(1);
-  mass->SetName("Mass");
-  //vtkDoubleArray *velo = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> velo;
-  velo->SetNumberOfComponents(3);
-  velo->SetNumberOfTuples(1);
-  velo->SetName("Velocity");
-
-  AxiSymStar->GetFieldData()->AddArray(velo);
-  AxiSymStar->GetFieldData()->AddArray(mass);
-
-  mass->SetValue(0, astar->Mass);
-  velo->SetTypedTuple(0, astar->Velocity);
-  //velo->Delete();
-  //mass->Delete();
-
-  return AxiSymStar;
-}
-
-//vtkCxxRevisionMacro(vtkAMRAmazeReaderInternal, "$Revision: 1.0 $");
-vtkStandardNewMacro(vtkAMRAmazeReaderInternal);
-
 vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 {
-  //this->FileName = NULL;
-  this->file_id = 0;
   this->Dimensionality = 0;
   this->NumberOfLevels = 0;
   this->NumberOfComponents = 0;
   this->Labels.clear();
   this->Grids.clear();
   this->Stars.clear();
-  this->LogDataOn();
-  this->DataScaleOn();
-  this->CellCenteredOff();
-  this->DebugOff();
-  this->MaxLevelWrite = -1;
+  this->DataScale = 1;
 
-  this->LevelRead[0] = -1;
-  this->LevelRead[1] = -1;
-
-  this->LevelRange[0] = -1;
-  this->LevelRange[1] = -1;
-  this->LengthScale = true; // GUI will ALWAYS overwrite that value
-  this->LengthScaleFactor = 1;
-  this->ScaleChoice = NoScale;
+  this->ScaleChoice = ScaleType::NoScale;
   //cerr << "AMAZEConstructor\n";
   this->VarNamesToLog["Density"] = 1;
   this->VarNamesToLog["Pressure"] = 1;
@@ -467,7 +224,7 @@ vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 
   this->NumberOfSphericallySymmetricStars = 0;
   this->NumberOfAxisSymmetricStars = 0;
-  this->MappedGrids = NoMap;
+  this->MappedGrids = MapName::NoMap;
 }
 
 vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
@@ -476,10 +233,13 @@ vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
   //cerr << "AMAZEDestructor\n";
   this->SetFileName(nullptr);
     
-  for(i=0; i < this->Stars.size(); i++)
+  for (auto* starPtr : this->Stars)
+  {
+    if (starPtr)
     {
-    (this->Stars[i])->Delete();
+      starPtr->Delete();
     }
+  }
   this->Stars.clear();
   
   this->Labels.clear();
@@ -487,31 +247,17 @@ vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
   this->Grids.clear();
   
   this->VarNamesToLog.clear();
-  if(this->file_id)
-    {
+
+  if (this->file_id > 0)
+  {
     H5Fclose(this->file_id);
-    this->file_id = 0;
-    //cerr << "465: H5Fclose( " << this->FileName << ")\n";
-    }
+    this->file_id = -1;
+  }
 }
 
-/*
-void vtkAMRAmazeReaderInternal::SetFileName( const char * fileName )
-{
-  this->FileName = fileName;
-}
-*/
-void vtkAMRAmazeReaderInternal::SetFileName(const char* filename)
-{
-  vtkSetStringBodyMacro(FileName, filename);
-  //this->Reset();
-}
-
-
-//----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 int vtkAMRAmazeReaderInternal::ReadMetaData()
 {
-  //FILE *fp=NULL;
   int levelId, GridId, i, node_veclen;
   double time, time_scalor;
 
@@ -527,13 +273,10 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   if(this->file_id<0)
     {
-    cerr << "file could not be opened. Check filename " << endl;
+    std::cerr << "file could not be opened. Check filename " << endl;
     return 0;
     }
   auto nbstars = this->ReadHDF5MetaData();
-  //cout << "done with ReadHDF5MetaData() " << endl;
-
-  //info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &this->Time, 1);
 
   this->Levels.resize(this->NumberOfLevels);
 
@@ -547,7 +290,7 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
 
   this->CheckVarSize(0, 0, this->Labels[0]);
 
-  if(this->file_id)
+  if(this->file_id > 0)
     {
     H5Fclose(this->file_id);
     this->file_id = 0;
@@ -572,15 +315,6 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
       }
     }
 
-  this->LevelRange[0] = 0;
-  this->LevelRange[1] = this->NumberOfLevels-1;
-
-  this->MinLevelRead = this->LevelRange[0];
-  this->MaxLevelRead = this->LevelRange[1];
-
-  int firstLevel = this->MinLevelRead;
-  int lastLevel = this->MaxLevelRead;
-
   /*
   cout << __LINE__ << "\tDimensionality: " << this->Dimensionality 
                  << "\n\tNumberOfComponents: " << this->NumberOfComponents
@@ -591,12 +325,66 @@ int vtkAMRAmazeReaderInternal::ReadMetaData()
   //int size = grid[0].dimensions[0];
 
   return nbstars;
-} // ReadMetaData()
+}
 
-/*
-Added the Logical to Physical mappers def.
-May 23, 2011
+void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_component &variable)
+{
+  hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
+  int domain = this->FindDomainId(levelId, block);
+  /*cerr << "domain = " << domain
+       << ", level = " << levelId
+       << ", block = " << block
+       << ", varname = " << variable.label
+       << endl;*/
+  const auto& grid = this->Grids[domain];
+
+  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
+  if(level_root_id < 0)
+    std::cerr << "bad level_root_id returned\n";
+  else
+    {
+    std::string lname = std::format("Grid {}", grid.layout.grid_nr);
+    if(H5Lexists(level_root_id, lname.c_str(), H5P_DEFAULT))
+      {
+      grid_root_id = H5Gopen(level_root_id, lname.c_str(), H5P_DEFAULT);
+      if(grid_root_id < 0)
+        std::cerr << "ReadVar(): bad grid_root_id returned\n";
+
+      int nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
+  /*
+  cerr << lname << ":" << PVlabels[(const char *)variable.label] << "("<< variable.vec_len << "," << nvals << ")\n";
+  cerr << "nvals = " << grid.layout.dimensions[0] << "x"<<
+                    grid.layout.dimensions[1]<< "x"<<
+                    grid.layout.dimensions[2]<< endl;
 */
+      dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
+      if(dataset_id < 0)
+        {
+        std::cerr << "error opening HDF5 dataset for var " << variable.label << endl;
+        }
+      hid_t space_id;
+      hsize_t dims[3], maxdims;
+      space_id = H5Dget_space(dataset_id);
+      H5Sget_simple_extent_dims(space_id, dims, NULL );
+    
+      H5Sclose(space_id);
+      H5Dclose(dataset_id);
+      H5Gclose(grid_root_id);
+      H5Gclose(level_root_id);
+
+      if (nvals == static_cast<int>(dims[0]))
+        {
+        //this->CellCenteredOff();
+        }
+      else
+        {
+        //this->CellCenteredOn();
+        }
+      return;
+      }
+    }
+}
+
 void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
 {
   hid_t   root_id, dataset, adG_grid_id, mapping_id, label1, label2, unitstring;
@@ -615,7 +403,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
     dataset = H5Dopen(root_id, "Shifted Grid Info", H5P_DEFAULT);
     if(dataset < 0)
       {
-      cerr << "failed to find shifted grid info. Returning without action\n";
+      std::cerr << "failed to find shifted grid info. Returning without action\n";
       H5Gclose(root_id);
       return;
       }
@@ -703,15 +491,15 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
     }
   H5Gclose(root_id);
 
-  if(this->MappedGrids && (root_id = H5Gopen(this->file_id, "/Map", H5P_DEFAULT) )>= 0)
+  if((this->MappedGrids !=  MapName::NoMap) && (root_id = H5Gopen(this->file_id, "/Map", H5P_DEFAULT) )>= 0)
     {
     dataset = H5Dopen(root_id, "Map Parameter", H5P_DEFAULT);
     if(dataset < 0)
       {
-      cerr << "error opening Map_Parameter\n";
+      std::cerr << "error opening Map_Parameter\n";
       }
     switch(this->MappedGrids) {
-      case Sphere_LogR:
+      case MapName::Sphere_LogR:
       label1 = H5Tcopy(H5T_C_S1);
       H5Tset_size(label1, 15);
       H5Tset_strpad(label1, H5T_STR_NULLTERM);
@@ -730,7 +518,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
 
       if ((status = H5Dread(dataset, mapping_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, this->SphereLogRMappings)) < 0)
         {
-        cerr << "error reading Map_Parameter\n";
+        std::cerr << "error reading Map_Parameter\n";
         }
 /*
       cerr << "\nparam =\t" << param[0].label << "\n\t";
@@ -744,7 +532,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
 */
       break;
       
-      case DCR_Cart2Spheres:
+      case MapName::DCR_Cart2Spheres:
       label1 = H5Tcopy(H5T_C_S1);
       H5Tset_size(label1, 6);
       H5Tset_strpad(label1, H5T_STR_NULLTERM);
@@ -765,18 +553,18 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
 
       if ((status = H5Dread(dataset, mapping_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->DCR_Mappings)) < 0)
         {
-        cerr << "error reading Map_Parameter\n";
+        std::cerr << "error reading Map_Parameter\n";
         }
-      cerr << "\nparam =\t"  << "\n\t";
-      cerr << DCR_Mappings.Rmin<< "\n\t";
-      cerr << DCR_Mappings.Rmax << "\n\t";
-      cerr << DCR_Mappings.MapCase << "\n\t";
-      cerr << DCR_Mappings.MapLunarity << "\n\t";
-      cerr << DCR_Mappings.Dimension << "\n\n";
+      std::cerr << "\nparam =\t"  << "\n\t";
+      std::cerr << DCR_Mappings.Rmin<< "\n\t";
+      std::cerr << DCR_Mappings.Rmax << "\n\t";
+      std::cerr << DCR_Mappings.MapCase << "\n\t";
+      std::cerr << DCR_Mappings.MapLunarity << "\n\t";
+      std::cerr << DCR_Mappings.Dimension << "\n\n";
       break;
       
       default:
-        cerr << "error finding an implemented Mapping code\n";
+        std::cerr << "error finding an implemented Mapping code\n";
       break;
     }
     H5Tclose(mapping_id); 
@@ -789,7 +577,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5VariablesMetaData()
 {
   hid_t   root_id, dataset, adG_component_id, labelstring, unitstring;
   herr_t  status;
-
+  
   root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
   dataset = H5Dopen(root_id, "Variable Info", H5P_DEFAULT);
 
@@ -797,21 +585,21 @@ void vtkAMRAmazeReaderInternal::ReadHDF5VariablesMetaData()
                 H5Tset_size(labelstring, adG_LABELLENGTH);
                 H5Tset_strpad(labelstring, H5T_STR_NULLTERM);
   unitstring =  H5Tcopy(H5T_C_S1);
-                H5Tset_size(unitstring, adG_UNITLENGTH-1);
+                H5Tset_size(unitstring, adG_UNITLENGTH-1); 
                 H5Tset_strpad(unitstring, H5T_STR_NULLTERM);
 
   adG_component_id = H5Tcreate(H5T_COMPOUND, sizeof(adG_component));
-
+  
   H5Tinsert(adG_component_id, "vector length", HOFFSET(adG_component, vec_len),
             H5T_NATIVE_INT);
-
+  
   H5Tinsert(adG_component_id, "Variable Name", HOFFSET(adG_component, label),
-		    labelstring);
-
+                    labelstring);
+    
   H5Tinsert(adG_component_id, "Variable Unit", HOFFSET(adG_component, unit),
             unitstring);
 
-  H5Tinsert(adG_component_id, "scale factor", 
+  H5Tinsert(adG_component_id, "scale factor",
             HOFFSET(adG_component, scalefactor), H5T_NATIVE_FLOAT);
 
   H5Tclose(labelstring);
@@ -824,6 +612,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5VariablesMetaData()
   H5Gclose(root_id);
 }
 
+
 // deciding on adding the Log10 prefix to the name can only be done after UpdateInformation
 // so we make this a separate call
 void vtkAMRAmazeReaderInternal::MakeVariableNames()
@@ -831,7 +620,7 @@ void vtkAMRAmazeReaderInternal::MakeVariableNames()
   for(int c=0; c < this->NumberOfComponents; c++)
     {
     std::ostringstream varName;
-    if(strlen(Labels[c].unit))
+    if(std::strlen(Labels[c].unit) > 0)
       {
 
       if(this->VarNamesToLog.find(Labels[c].label) == this->VarNamesToLog.end())
@@ -851,7 +640,6 @@ void vtkAMRAmazeReaderInternal::MakeVariableNames()
       varName << Labels[c].label << ends;
       }
     PVlabels[(const char *)Labels[c].label] = varName.str();
-    //delete[] varName.str();
     }
 }
 
@@ -914,20 +702,20 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
 
   switch(this->ScaleChoice)
     {
-    case 0: // pc
+    case ScaleType::pc:
       this->LengthScaleFactor  *= 3.08567782e18;
-      cout << "!!!\nUsing PARSEC with Length Scale Factor * by 3.08567782e18 = " << this->LengthScaleFactor << "!!!\n";
+      std::cout << "!!!\nUsing PARSEC with Length Scale Factor * by 3.08567782e18 = " << this->LengthScaleFactor << "!!!\n";
     break;
-    case 1: // AU
+    case ScaleType::AU:
       this->LengthScaleFactor  *= 1.49597870700e13;
-      cout << "!!!\nUsing AU with Length Scale Factor * by 1.49597870700e13 = " << this->LengthScaleFactor << "!!!\n";
+      std::cout << "!!!\nUsing AU with Length Scale Factor * by 1.49597870700e13 = " << this->LengthScaleFactor << "!!!\n";
     break;
-    case 2: // RSun
+    case ScaleType::RSun:
       this->LengthScaleFactor  *= 6.96342e10;
-      cout << "!!!\nUsing RSun with Length Scale Factor * by 6.96342e10 = " << this->LengthScaleFactor << "!!!\n";
+      std::cout << "!!!\nUsing RSun with Length Scale Factor * by 6.96342e10 = " << this->LengthScaleFactor << "!!!\n";
     break;
-    case 3:
-      //cout << "!!!\nLength Scale Factor  is untouched!!!\n";
+    case ScaleType::NoScale:
+      //std::cout << "!!!\nLength Scale Factor  is untouched!!!\n";
     break;
     }
 
@@ -942,13 +730,13 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
 
     if(!strncmp(map_type, "Sphere-LogR", 11))
       {
-      this->MappedGrids = Sphere_LogR;
-      cerr << "Using Mapped Grids:" << this->MappedGrids << endl;
+      this->MappedGrids = MapName::Sphere_LogR;
+      //std::cerr << "Using Mapped Grids:" << this->MappedGrids << endl;
       }
     else if(!strncmp(map_type, "DCR_Cart2Spheres", 16))
       {
-      this->MappedGrids = DCR_Cart2Spheres;
-      cerr << "Using Mapped Grids:" << this->MappedGrids << endl;
+      this->MappedGrids = MapName::DCR_Cart2Spheres;
+      //std::cerr << "Using Mapped Grids:" << this->MappedGrids << endl;
       }
     status = H5Aclose(attr1);
     status = H5Gclose(map_id);
@@ -978,6 +766,137 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
   return nb_stars;
 } // end of ReadHDF5MetaData()
 
+// returns the global id for the given block
+int vtkAMRAmazeReaderInternal::FindDomainId(int level, int block)
+{     
+  int domain = 0;
+  for(int l=0; l < level; l++)
+    domain += this->Levels[l].GridsPerLevel;
+  domain += block;
+  if (domain >= this->NumberOfGrids)
+   
+    std::cerr << "level or block too high for this dataset\n";
+  return domain;
+}
+
+void vtkAMRAmazeReaderInternal::GetSpacing(int level, double *spacing)
+{
+  if(this->Dimensionality == 3)  // a 3D grid
+  {
+    if(this->LengthScale)
+    {
+      spacing[2] = this->Levels[level].DXs[2] / this->LengthScaleFactor;
+      spacing[1] = this->Levels[level].DXs[1] / this->LengthScaleFactor;
+      spacing[0] = this->Levels[level].DXs[0] / this->LengthScaleFactor;
+    }
+    else
+      {
+      spacing[2] = this->Levels[level].DXs[2];
+      spacing[1] = this->Levels[level].DXs[1];
+      spacing[0] = this->Levels[level].DXs[0];
+      }
+  }
+  else
+    {
+    if(this->LengthScale)
+      {
+      spacing[2] = 0.0;
+      spacing[1] = this->Levels[level].DXs[1] / this->LengthScaleFactor;
+      spacing[0] = this->Levels[level].DXs[0] / this->LengthScaleFactor;
+      }
+    else
+      {
+      spacing[2] = 0.0;
+      spacing[1] = this->Levels[level].DXs[1];
+      spacing[0] = this->Levels[level].DXs[0];
+      }
+    }
+}
+
+int vtkAMRAmazeReaderInternal::GetBlockLevel(const int domain) const
+{
+  int gid = domain;
+  int l=0;
+
+  while(gid >= this->Levels[l].GridsPerLevel)
+    {
+    gid -= this->Levels[l].GridsPerLevel;
+    l++;
+    }
+  return l;
+}
+
+vtkUniformGrid* vtkAMRAmazeReaderInternal::GetAMRGrid(int blockIdx)
+{
+  int levelId, block_unused;
+  // need to retrieve my levelId
+  this->FindLevelAndBlock(blockIdx, levelId, block_unused);
+
+  const auto& grid = this->Grids[blockIdx];
+  // uniform is uniform, so no need to get all 3 DXs. One is enough
+
+  double dx[3]; // spacing is constant at a given level
+  dx[0] = this->Levels[levelId].DXs[0];
+  dx[1] = this->Levels[levelId].DXs[1];
+  dx[2] = this->Levels[levelId].DXs[2];
+
+  vtkStringArray *sarr = vtkStringArray::New();
+  sarr->SetName("GridName");
+  sarr->SetNumberOfComponents(1);
+  sarr->SetNumberOfTuples(1);
+  
+  sarr->SetValue(0, std::format("Grid {}", grid.layout.grid_nr));
+  vtkUniformGrid* ug = vtkUniformGrid::New();
+  ug->Initialize();
+  ug->GetFieldData()->AddArray(sarr);
+  sarr->Delete();
+      
+  if(grid.layout.dimensions[2] > 1)  // a 3D grid
+    {
+    if(this->LengthScale)
+       ug->SetSpacing(dx[0]/this->LengthScaleFactor,
+                      dx[1]/this->LengthScaleFactor,
+                      dx[2]/this->LengthScaleFactor);
+    else
+      ug->SetSpacing(dx[0], dx[1], dx[2]);
+    }
+  else
+    {
+    if(this->LengthScale)
+      ug->SetSpacing(dx[0]/this->LengthScaleFactor,
+                     dx[1]/this->LengthScaleFactor,
+                     0.0);
+    else
+      ug->SetSpacing(dx[0], dx[1], 0.0);
+    }
+  if(this->LengthScale)
+    ug->SetOrigin(grid.layout.origin[0]/this->LengthScaleFactor,
+                  grid.layout.origin[1]/this->LengthScaleFactor,
+                  grid.layout.origin[2]/this->LengthScaleFactor);
+  else
+    ug->SetOrigin(grid.layout.origin[0], grid.layout.origin[1], grid.layout.origin[2]);
+  ug->SetDimensions(grid.layout.dimensions[0],
+                    grid.layout.dimensions[1],
+                    grid.layout.dimensions[2]);
+
+  return ug;
+} // GetAMRGrid
+
+// returns the level and block id at that level for the given global id
+void  vtkAMRAmazeReaderInternal::FindLevelAndBlock(int domain, int &level, int &block) const
+{
+  int gid = domain;
+  int l=0; 
+    
+  while(gid >= this->Levels[l].GridsPerLevel)
+    {
+    gid -= this->Levels[l].GridsPerLevel;
+    l++;
+    }
+  level = l;
+  block = gid;
+}
+
 vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *varname)
 {
 // find which adG_component that is and then go ahead
@@ -995,30 +914,30 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVisItVar(int domain, const char *
     return this->ReadVar(level, block, this->Labels[i]);
     }
   else
-    return NULL;
+    return nullptr;
 }
-
 
 vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_component &variable)
 {
   hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
   int domain = this->FindDomainId(levelId, block);
-  /*cerr << "domain = " << domain 
-       << ", level = " << levelId 
-       << ", block = " << block 
-       << ", varname = " << variable.label 
-       << endl;*/
-  adG_grid grid = this->Grids[domain];
+  /*
+  std::cerr << "domain = " << domain
+       << ", level = " << levelId
+       << ", block = " << block
+       << ", varname = " << variable.label
+       << endl;
+  */
+  const auto& grid = this->Grids[domain];
 
-  //cerr << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
   if(level_root_id < 0)
-    cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
+    std::cerr << __LINE__ << ": ReadVar() bad level_root_id returned\n";
 
   grid_root_id = H5Gopen(level_root_id, std::format("Grid {}", grid.layout.grid_nr).c_str(), H5P_DEFAULT);
   if(grid_root_id < 0)
-    cerr << __LINE__<< ": ReadVar(): bad grid_root_id returned\n";
+    std::cerr << __LINE__<< ": ReadVar(): bad grid_root_id returned\n";
 
 // for 2D case with 2D vectors, we create a 3-tuple anyway, fill in the 3rd component with zeroes
 // and we must define a hyperslab select to only fill in the first 2 columns.
@@ -1028,7 +947,7 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
 // default naming. Could be over-written by "Log10()"
 
   int nvals;
-  if(GetCellCentered())
+  if(0) //GetCellCentered())
     {
     if(grid.layout.dimensions[2] != 1)
       nvals = (grid.layout.dimensions[0]-1) * (grid.layout.dimensions[1]-1) * (grid.layout.dimensions[2]-1);
@@ -1053,26 +972,24 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
   H5Sselect_hyperslab (mem_space_id, H5S_SELECT_SET, offset, NULL, count, NULL);
 
   scalars->SetNumberOfTuples(nvals);
-  //cerr << "reading PointDataArray " << variable.label<<endl;
   void *dataArray = scalars->GetVoidPointer(0);
 
   dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
   if(dataset_id < 0)
      {
-     cerr << "error opening HDF5 dataset for var " << variable.label << endl;
+     std::cerr << "error opening HDF5 dataset for var " << variable.label << endl;
      }
 
   if(H5Dread(dataset_id, H5T_NATIVE_DOUBLE, mem_space_id, H5S_ALL, H5P_DEFAULT, dataArray) < 0)
-     {
-     cerr << "951:error reading HDF5 dataset for var " << variable.label << endl;
-     }
+  {
+    std::cerr << __LINE__ << " :error reading HDF5 dataset for var " << variable.label << endl;
+  }
 
   double *dArray = (double *)dataArray;
   if(variable.vec_len == 2) for(int k=0; k < nvals * 3; k+=3) dArray[k+2] = 0;
 
   if(this->DataScale == true && variable.scalefactor != 1.0)
     {
-    vtkDebugMacro( << "should divide by scaling factor "<< variable.scalefactor << " for " << *(variable.label));
     for(int k=0; k < nvals * variable.vec_len; k++)
       {
       dArray[k] /= variable.scalefactor;
@@ -1080,819 +997,27 @@ vtkDoubleArray* vtkAMRAmazeReaderInternal::ReadVar(int levelId, int block, adG_c
     }
 
   if(this->VarNamesToLog.find((const char *)variable.label) == this->VarNamesToLog.end())
-    {
+  {
      //std::cout<< variable.label << " is not in the map!"<<endl;
-    }
+  }
   else if(this->LogData)
-    {
+  {
     for(int k=0; k < nvals ; k++)
-      {
+    {
       dArray[k] = log10(dArray[k]);
-      }
     }
+  }
   H5Sclose(mem_space_id);
   H5Dclose(dataset_id);
   H5Gclose(grid_root_id);
   H5Gclose(level_root_id);
   if(this->file_id)
-    {
+  {
     H5Fclose(this->file_id);
     this->file_id = 0;
-    }
+  }
   return scalars;
 }
-
-void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_component &variable)
-{
-  hid_t level_root_id, grid_root_id, dataset_id, mem_space_id;
-  int domain = this->FindDomainId(levelId, block);
-  /*cerr << "domain = " << domain 
-       << ", level = " << levelId 
-       << ", block = " << block 
-       << ", varname = " << variable.label 
-       << endl;*/
-  adG_grid grid = this->Grids[domain];
-
-  level_root_id = H5Gopen(this->file_id, std::format("/Level {}", levelId).c_str(), H5P_DEFAULT);
-  if(level_root_id < 0)
-    cerr << "bad level_root_id returned\n";
-  else
-    {
-    std::string lname = std::format("Grid {}", grid.layout.grid_nr);
-    if(H5Lexists(level_root_id, lname.c_str(), H5P_DEFAULT))
-      {
-      grid_root_id = H5Gopen(level_root_id, lname.c_str(), H5P_DEFAULT);
-      if(grid_root_id < 0)
-        cerr << "ReadVar(): bad grid_root_id returned\n";
-
-      int nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
-  /*
-  cerr << lname << ":" << PVlabels[(const char *)variable.label] << "("<< variable.vec_len << "," << nvals << ")\n";
-  cerr << "nvals = " << grid.layout.dimensions[0] << "x"<<
-                    grid.layout.dimensions[1]<< "x"<<
-                    grid.layout.dimensions[2]<< endl;
-*/
-      dataset_id = H5Dopen(grid_root_id, (const char *) variable.label, H5P_DEFAULT);
-      if(dataset_id < 0)
-        {
-        cerr << "error opening HDF5 dataset for var " << variable.label << endl;
-        }
-      hid_t space_id;
-      hsize_t dims[3], maxdims;
-      space_id = H5Dget_space(dataset_id);
-      H5Sget_simple_extent_dims(space_id, dims, NULL );
-
-      H5Sclose(space_id);
-      H5Dclose(dataset_id);
-      H5Gclose(grid_root_id);
-      H5Gclose(level_root_id);
-
-      if(nvals  == dims[0])
-        {
-        this->CellCenteredOff();
-        }
-      else
-        {
-        this->CellCenteredOn();
-        }
-      return;
-      }
-    }
-}
-
-// The ParaView reader already has the notion of level and block-id within that level
-// so we use that for the method's signature and we calculate the domain-id
-// domain-id is between 0 and N-1
-
-vtkUniformGrid* vtkAMRAmazeReaderInternal::GetAMRGrid(int blockIdx)
-{
-  int levelId, b;
-  // need to retrieve my levelId
-  this->FindLevelAndBlock(blockIdx, levelId, b);
-  
-  adG_grid grid = this->Grids[blockIdx];
-  // uniform is uniform, so no need to get all 3 DXs. One is enough
-
-  double dx[3]; // spacing is constant at a given level
-  dx[0] = this->Levels[levelId].DXs[0];
-  dx[1] = this->Levels[levelId].DXs[1];
-  dx[2] = this->Levels[levelId].DXs[2];
-
-  vtkStringArray *sarr = vtkStringArray::New();
-  sarr->SetName("GridName");
-  sarr->SetNumberOfComponents(1);
-  sarr->SetNumberOfTuples(1);
-
-  sarr->SetValue(0, std::format("Grid {}", grid.layout.grid_nr));
-  vtkUniformGrid* ug = vtkUniformGrid::New();
-  ug->Initialize();
-  ug->GetFieldData()->AddArray(sarr);
-  sarr->Delete();
-
-  if(grid.layout.dimensions[2] > 1)  // a 3D grid
-    {
-    if(this->LengthScale)
-       ug->SetSpacing(dx[0]/this->LengthScaleFactor,
-                      dx[1]/this->LengthScaleFactor,
-                      dx[2]/this->LengthScaleFactor);
-    else
-      ug->SetSpacing(dx[0], dx[1], dx[2]);
-    }
-  else
-    {
-    if(this->LengthScale)
-      ug->SetSpacing(dx[0]/this->LengthScaleFactor,
-                     dx[1]/this->LengthScaleFactor,
-                     0.0);
-    else
-      ug->SetSpacing(dx[0], dx[1], 0.0);
-    }
-  //ug->SetWholeExtent(0, grid.layout.dimensions[0]-1,
-                     //0, grid.layout.dimensions[1]-1,
-                     //0, grid.layout.dimensions[2]-1);
-  if(this->LengthScale)
-    ug->SetOrigin(grid.layout.origin[0]/this->LengthScaleFactor,
-                  grid.layout.origin[1]/this->LengthScaleFactor,
-                  grid.layout.origin[2]/this->LengthScaleFactor);
-  else
-    ug->SetOrigin(grid.layout.origin[0], grid.layout.origin[1], grid.layout.origin[2]);
-  ug->SetDimensions(grid.layout.dimensions[0],
-                    grid.layout.dimensions[1],
-                    grid.layout.dimensions[2]);
-
-  return ug;
-} // GetAMRGrid
-
-void
-map_rtp2xyz(double R, double T, double P,
-            double *x, double *y, double *z)
-{
-  *x = R * cos(T);
-  *y = R * sin(T); // intermediate y calculation
-  *z = *y * sin(P);
-  *y *= cos(P);
-//cerr << " " << R << " " << T << " " << P << " => " << *x << " " << *y << " " << *z << endl;
-}
-
-vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid(int domain)
-{
-  int I, nvals, levelId, blockId;
-  double x, y, z;
-  adG_grid grid = this->Grids[domain];
-  this->FindLevelAndBlock(domain, levelId, blockId);
-  double dx[3]; // spacing is constant at a given level
-  dx[0] = this->Levels[levelId].DXs[0];
-  dx[1] = this->Levels[levelId].DXs[1];
-  dx[2] = this->Levels[levelId].DXs[2];
-
-/*
-  cerr << "Phi ranges from "    << grid.layout.origin[2] << " to " << grid.layout.origin[5] << " with increment " << dx[2] << endl;
-  cerr << "Theta ranges from "  << grid.layout.origin[1] << " to " << grid.layout.origin[4] << " with increment " << dx[1] << endl;
-  cerr << "Radius ranges from " << grid.layout.origin[0] << " to " << grid.layout.origin[3] << " with increment " << dx[0] << endl;
-
-*/
-  vtkCharArray *nameArray = vtkCharArray::New();
-  nameArray->SetName("Name");
-  char *name = nameArray->WritePointer(0, 20);
-  sprintf(name, "Grid %d", grid.layout.grid_nr);
-
-  vtkStructuredGrid* sg = vtkStructuredGrid::New();
-  sg->GetFieldData()->AddArray(nameArray);
-  nameArray->Delete();
-  //vtkDoubleArray *data = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> data;
-  data->SetName("Time");
-  data->InsertValue(0, this->AMAZETime);
-  sg->GetFieldData()->AddArray(data);
-  //data->Delete();
-
-  sg->SetDimensions(grid.layout.dimensions[0],
-                    grid.layout.dimensions[1],
-                    grid.layout.dimensions[2]);
-  nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
-
-  //vtkDoubleArray *coords = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> coords;
-  coords->SetNumberOfComponents(3);
-  coords->SetNumberOfTuples(nvals);
-
-  int Iphi, Itheta, Iradius;
-
-  //dx[0] = dx[1]; //. Rolf said the example is wrong 
-  double NLevel_R = (1.0 - 0.0) / dx[0];
-  //cerr << "NLevel_R " << NLevel_R << endl;
-  double Delta_Level_T = (this->SphereLogRMappings[1].Tmax - this->SphereLogRMappings[1].Tmin)/((1.0 - 0.0) / dx[1]);
-  //cerr << "Delta_Level_T " << Delta_Level_T << endl;
-  double Delta_Level_P = (this->SphereLogRMappings[1].Pmax - this->SphereLogRMappings[1].Pmin)/((1.0 - 0.0) / dx[2]);
-  //cerr << "Delta_Level_P " << Delta_Level_P << endl;
-
-  double alpha = pow((this->SphereLogRMappings[1].Rmax/this->SphereLogRMappings[1].Rmin), 1.0/NLevel_R) - 1;
-  //cerr << "alpha " << alpha << endl;
-  for(Iphi=0; Iphi < grid.layout.dimensions[2]; Iphi++)
-    {
-    double arg_phi = this->SphereLogRMappings[1].Pmin + (grid.layout.box_corners[2] + Iphi)*Delta_Level_P;
-    for(Itheta=0; Itheta < grid.layout.dimensions[1]; Itheta++)
-      {
-      double arg_theta = this->SphereLogRMappings[1].Tmin + (grid.layout.box_corners[1] + Itheta)*Delta_Level_T;
-// so the fastest index is the radial index. 
-// cell 0 is at the lower right corner of the 2D map, and then the theta sweep goes from 0 to PI in counter-clockwise fashion
-      I = Iphi*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Itheta*grid.layout.dimensions[0];
-      for(Iradius=0; Iradius < grid.layout.dimensions[0]; Iradius++)
-        {
-         //if(Itheta==0) cerr << this->SphereLogRMappings[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius) << "\n";
-        double R = this->SphereLogRMappings[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius);
-        R /= this->LengthScaleFactor;
-        map_rtp2xyz(R, arg_theta, arg_phi, &x, &y, &z);
-        //coords->SetTuple3(I+Iradius, param[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius), arg_theta, arg_phi);
-        coords->SetTuple3(I+Iradius, x, y, z);
-        }//if(Itheta==0) cerr << endl;
-      }
-    }
-
-  vtkPoints *points = vtkPoints::New();
-  points->SetData(coords);
-  //coords->Delete();
-  sg->SetPoints(points);
-  points->Delete();
-
-  return sg;
-} // ReadStructuredGrid
-
-void
-map_c2p_fig31(double xc, double yc, double zc, double R1,
-        double *xp, double *yp, double *zp)
-{
-  double d, r;
-  if (fabs(xc) > fabs(yc))
-     d = fabs(xc);
-  else
-     d = fabs(yc);
-  r = sqrt(xc*xc + yc*yc);
-  if (r < 1.e-10)
-     r = 1.e-10;
-  *xp = R1 * d * xc/r;
-  *yp = R1 * d * yc/r;
-  *zp = 0.0;
-//cerr << " " << R << " " << T << " " << P << " => " << *x << " " << *y << " " << *z << endl;
-}
-
-void
-map_c2p_fig32a(double xc, double yc, double zc, double R1,
-        double *xp, double *yp, double *zp)
-{
-//inputs are xc, yc, zc, R1
-//outputs are xp, yp, zp
-  double R, center, D, d, absxc, absyc;
-  absxc = fabs(xc);
-  absyc = fabs(yc);
-
-  if (absxc > absyc)
-     d = absxc;
-  else
-     d = absyc;
-
-  if (d < 1.e-10)
-     d = 1.e-10;
-  D = R1 * d / M_SQRT2;
-  R = R1 * d;
-  R = R*R; // we do this here because we only use R^2 until the end and exit.
-  center = D -sqrt(R - D*D);
-
-  D /= d; // used twice below
-  *xp = D * absxc;
-  *yp = D * absyc;
-  
-  
-  if(absyc >= absxc)
-    *yp = center + sqrt(R - *xp * *xp);
-  if(absxc >= absyc)
-    *xp = center + sqrt(R - *yp * *yp);
-  if(xc < 0)
-    *xp = -1. * *xp;
-  if(yc < 0)
-    *yp = -1. * *yp;
-  *zp = 0.0;
-}
-
-void
-map_c2p_fig32b(double xc, double yc, double zc, double R1,
-        double *xp, double *yp, double *zp)
-{
-//inputs are xc, yc, zc, R1
-//outputs are xp, yp, zp
-  double R, center, D, d, absxc, absyc;
-  absxc = fabs(xc);
-  absyc = fabs(yc);
-
-  if (absxc > absyc)
-     d = absxc;
-  else
-     d = absyc;
-
-  if (d < 1.e-10)
-     d = 1.e-10;
-  D = R1 * d / M_SQRT2;
-  R = R1;
-  R = R*R; // we do this here because we only use R^2 until the end and exit.
-  center = D -sqrt(R - D*D);
-
-  D /= d; // used twice below
-  *xp = D * absxc;
-  *yp = D * absyc;
-  
-  
-  if(absyc >= absxc)
-    *yp = center + sqrt(R - *xp * *xp);
-  if(absxc >= absyc)
-    *xp = center + sqrt(R - *yp * *yp);
-  if(xc < 0)
-    *xp = -1. * *xp;
-  if(yc < 0)
-    *yp = -1. * *yp;
-  *zp = 0.0;
-}
-
-void
-map_c2p_fig32c(double xc, double yc, double zc, double R1,
-        double *xp, double *yp, double *zp)
-{
-//inputs are xc, yc, zc, R1
-//outputs are xp, yp, zp
-  double R, center, D, d, absxc, absyc;
-  absxc = fabs(xc);
-  absyc = fabs(yc);
-
-  if (absxc > absyc)
-     d = absxc;
-  else
-     d = absyc;
-
-  if (d < 1.e-10)
-     d = 1.e-10;
-  D = R1 * d * (2.0 - d)/ M_SQRT2;
-  R = R1;
-  R = R*R; // we do this here because we only use R^2 until the end and exit.
-  center = D -sqrt(R - D*D);
-
-  D /= d; // used twice below
-  *xp = D * absxc;
-  *yp = D * absyc;
-  
-  
-  if(absyc >= absxc)
-    *yp = center + sqrt(R - *xp * *xp);
-  if(absxc >= absyc)
-    *xp = center + sqrt(R - *yp * *yp);
-  if(xc < 0)
-    *xp = -1. * *xp;
-  if(yc < 0)
-    *yp = -1. * *yp;
-  *zp = 0.0;
-}
-
-
-void
-map_c2p_fig32d(double xc, double yc, double zc, double R1,
-        double *xp, double *yp, double *zp)
-{
-//inputs are xc, yc, zc, R1
-//outputs are xp, yp, zp
-  double d, r, w;
-  if (fabs(xc) > fabs(yc))
-     d = fabs(xc);
-  else
-     d = fabs(yc);
-  r = sqrt(xc*xc + yc*yc);
-  if (r < 1.e-10)
-     r = 1.e-10;
-  *xp = R1 * d * xc/r;
-  *yp = R1 * d * yc/r;
-  w = d*d;
-  *xp = w*(*xp) + (1.-w) * R1 * xc / M_SQRT2;
-  *yp = w*(*yp) + (1.-w) * R1 * yc / M_SQRT2;
-  *zp = 0.0;
-//cerr << " " << R << " " << T << " " << P << " => " << *x << " " << *y << " " << *z << endl;
-}
-
-vtkStructuredGrid* vtkAMRAmazeReaderInternal::ReadStructuredGrid2(int domain)
-{
-  int I, nvals, levelId, blockId;
-  double x, y, z;
-  adG_grid grid = this->Grids[domain];
-  this->FindLevelAndBlock(domain, levelId, blockId);
-  double dx[3]; // spacing is constant at a given level
-  dx[0] = this->Levels[levelId].DXs[0];
-  dx[1] = this->Levels[levelId].DXs[1];
-  dx[2] = this->Levels[levelId].DXs[2];
-
-  //cerr << "Phi ranges from "    << grid.layout.origin[2] << " to " << grid.layout.origin[5] << " with increment " << dx[2] << endl;
-  //cerr << "Theta ranges from "  << grid.layout.origin[1] << " to " << grid.layout.origin[4] << " with increment " << dx[1] << endl;
-  //cerr << "Radius ranges from " << grid.layout.origin[0] << " to " << grid.layout.origin[3] << " with increment " << dx[0] << endl;
-
-  vtkCharArray *nameArray = vtkCharArray::New();
-  nameArray->SetName("Name");
-  char *name = nameArray->WritePointer(0, 20);
-  sprintf(name, "Grid %d", grid.layout.grid_nr);
-
-  vtkStructuredGrid* sg = vtkStructuredGrid::New();
-  sg->GetFieldData()->AddArray(nameArray);
-  nameArray->Delete();
-  //vtkDoubleArray *data = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> data;
-  data->SetName("Time");
-  data->InsertValue(0, this->AMAZETime);
-  sg->GetFieldData()->AddArray(data);
-  //data->Delete();
-
-  sg->SetDimensions(grid.layout.dimensions[0],
-                    grid.layout.dimensions[1],
-                    grid.layout.dimensions[2]);
-  nvals = grid.layout.dimensions[0] * grid.layout.dimensions[1] * grid.layout.dimensions[2];
-
-  //vtkDoubleArray *coords = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> coords;
-  coords->SetNumberOfComponents(3);
-  coords->SetNumberOfTuples(nvals);
-
-/*
-  if(this->LengthScale)
-    {
-    dx[0] = dx[0]/this->LengthScaleFactor;
-    dx[1] = dx[1]/this->LengthScaleFactor;
-    dx[2] = dx[2]/this->LengthScaleFactor;
-    }
-*/
-  int Ix, Iy, Iz;
-  double Ox, Oy, Oz, xc, yc, zc;
-
-  if(this->LengthScale)
-    {
-    Ox = grid.layout.origin[0]/this->LengthScaleFactor;
-    Oy = grid.layout.origin[1]/this->LengthScaleFactor;
-    Oz = grid.layout.origin[2]/this->LengthScaleFactor;
-    }
-  else
-    {
-    Ox = grid.layout.origin[0];
-    Oy = grid.layout.origin[1];
-    Oz = grid.layout.origin[2];
-    }
-  double R = this->DCR_Mappings.Rmax;
-  //R /= this->LengthScaleFactor;
-  if(!strncmp(this->DCR_Mappings.MapCase, "CASE_A", 6))
-    {
-    cerr << "CASE_A"    << endl;
-    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
-    {
-    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
-      {
-      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
-      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
-        {
-        if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "QUARTER", 7))
-          {
-          xc = Ox + Ix*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        map_c2p_fig32a(xc, yc, zc, R, &x, &y, &z);
-        coords->SetTuple3(I+Ix, x, y, z);
-        }
-      }
-    }
-    }
-  if(!strncmp(this->DCR_Mappings.MapCase, "CASE_B", 6))
-    {
-    cerr << "CASE_B"    << endl;
-    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
-    {
-    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
-      {
-      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
-      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
-        {
-        if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "QUARTER", 7))
-          {
-          xc = Ox + Ix*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        map_c2p_fig32b(xc, yc, zc, R, &x, &y, &z);
-        coords->SetTuple3(I+Ix, x, y, z);
-        }
-      }
-    }
-    }
-  if(!strncmp(this->DCR_Mappings.MapCase, "CASE_C", 6))
-    {
-    cerr << "CASE_C"    << endl;
-    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
-    {
-    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
-      {
-      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
-      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
-        {
-        if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "QUARTER", 7))
-          {
-          xc = Ox + Ix*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        map_c2p_fig32c(xc, yc, zc, R, &x, &y, &z);
-        coords->SetTuple3(I+Ix, x, y, z);
-        }
-      }
-    }
-    }
-  else if(!strncmp(this->DCR_Mappings.MapCase, "CASE_D", 6))
-    {
-    cerr << "CASE_D"    << endl;
-    for(Iz=0; Iz < grid.layout.dimensions[2]; Iz++)
-    {
-    for(Iy=0; Iy < grid.layout.dimensions[1]; Iy++)
-      {
-      I = Iz*(grid.layout.dimensions[1]*grid.layout.dimensions[0]) + Iy*grid.layout.dimensions[0];
-      for(Ix=0; Ix < grid.layout.dimensions[0]; Ix++)
-        {
-        if(!strncmp(this->DCR_Mappings.MapLunarity, "FULL", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + (2*Iy-(grid.layout.dimensions[1]-1))*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "HALF", 4))
-          {
-          xc = Ox + (2*Ix-(grid.layout.dimensions[0]-1))*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        else if(!strncmp(this->DCR_Mappings.MapLunarity, "QUARTER", 7))
-          {
-          xc = Ox + Ix*dx[0];
-          yc = Oy + Iy*dx[1];
-          zc = 0;
-          }
-        map_c2p_fig32d(xc, yc, zc, R, &x, &y, &z);
-        //coords->SetTuple3(I+Iradius, param[1].Rmin * pow(1.0 + alpha, grid.layout.box_corners[0]+Iradius), arg_theta, arg_phi);
-        coords->SetTuple3(I+Ix, x, y, z);
-        }//if(Itheta==0) cerr << endl;
-      }
-    }
-    }
-
-  //vtkPoints *points = vtkPoints::New();
-  vtkNew<vtkPoints> points;
-  points->SetData(coords);
-  //coords->Delete();
-  sg->SetPoints(points);
-  //points->Delete();
-
-  return sg;
-} // ReadStructuredGrid2
-
-vtkRectilinearGrid* vtkAMRAmazeReaderInternal::ReadRectilinearGrid(int domain)
-{
-  int i, levelId, blockId;
-
-  adG_grid grid = this->Grids[domain];
-  this->FindLevelAndBlock(domain, levelId, blockId);
-
-  double dx[3]; // spacing is constant at a given level
-  dx[0] = this->Levels[levelId].DXs[0];
-  dx[1] = this->Levels[levelId].DXs[1];
-  dx[2] = this->Levels[levelId].DXs[2];
-  vtkRectilinearGrid* rg = vtkRectilinearGrid::New();
-
-  //vtkDoubleArray *xcoords = vtkDoubleArray::New();
-  //vtkDoubleArray *ycoords = vtkDoubleArray::New();
-  //vtkDoubleArray *zcoords = vtkDoubleArray::New();
-  vtkNew<vtkDoubleArray> xcoords;
-  vtkNew<vtkDoubleArray> ycoords;
-  vtkNew<vtkDoubleArray> zcoords;
-
-  xcoords->SetNumberOfComponents(1);
-  ycoords->SetNumberOfComponents(1);
-  zcoords->SetNumberOfComponents(1);
-
-  xcoords->SetNumberOfTuples(grid.layout.dimensions[0]);
-  ycoords->SetNumberOfTuples(grid.layout.dimensions[1]);
-
-  if(this->LengthScale)
-    {
-  //cerr << "LengthScaleFactor = " << this->LengthScaleFactor<<"\n";
-    dx[0] = dx[0]/this->LengthScaleFactor;
-    dx[1] = dx[1]/this->LengthScaleFactor;
-    dx[2] = dx[2]/this->LengthScaleFactor;
-    }
-  //cerr << "RectGrid(dx0,dx1,dx2) "<< dx[0] << ", "<< dx[1] << "," << dx[2]<<"\n";
-  if(grid.layout.dimensions[2] > 1)  // a 3D grid
-    {
-    zcoords->SetNumberOfTuples(grid.layout.dimensions[2]);
-    }
-  else
-    {
-    zcoords->SetNumberOfTuples(1);
-    }
-
-  //rg->SetWholeExtent(0, grid.layout.dimensions[0]-1,
-                     //0, grid.layout.dimensions[1]-1,
-                     //0, grid.layout.dimensions[2]-1);
-  double origin;
-  if(this->LengthScale)
-    origin = grid.layout.origin[0]/this->LengthScaleFactor;
-  else
-    origin = grid.layout.origin[0];
-
-  for(i=0; i < grid.layout.dimensions[0]; i++)
-    {
-    xcoords->SetValue(i, (origin + i*dx[0]) );
-    }
-  //cerr << "Grid(x0,x1, y0,y1,z0,z1) "<< domain << ": "<<origin << "," << (origin + (i-1)*dx[0])<<", ";
-  rg->SetXCoordinates(xcoords);
-  //xcoords->Delete();
-/////////////////////////////////////////
-  if(this->LengthScale)
-    origin = grid.layout.origin[1]/this->LengthScaleFactor;
-  else
-    origin = grid.layout.origin[1];
-
-  for(i=0; i < grid.layout.dimensions[1]; i++)
-    {
-    ycoords->SetValue(i, origin + i*dx[1] );
-    }
-  //cerr << origin << "," << origin + (i-1)*dx[1]<<", ";
-  rg->SetYCoordinates(ycoords);
-  //ycoords->Delete();
-/////////////////////////////////////////
-  if(this->LengthScale)
-    origin = grid.layout.origin[2]/this->LengthScaleFactor;
-  else
-    origin = grid.layout.origin[2];
-
-  for(i=0; i < grid.layout.dimensions[2]; i++)
-    {
-    zcoords->SetValue(i, origin + i*dx[2] );
-    }
-  //cerr << origin << "," << origin + (i-1)*dx[2]<<"\n";
-  rg->SetZCoordinates(zcoords);
-  //zcoords->Delete();
-/////////////////////////////////////////
-
-  rg->SetDimensions(grid.layout.dimensions[0],
-                    grid.layout.dimensions[1],
-                    grid.layout.dimensions[2]);
-
-/*
-cerr << "RG: of size " << grid.layout.dimensions[0] << "x"<<
-                    grid.layout.dimensions[1]<< "x"<<
-                    grid.layout.dimensions[2]<<endl;
-*/
-
-  return rg;
-} // ReadRectilinearGrid()
-
-// returns the level and block id at that level for the given global id
-void  vtkAMRAmazeReaderInternal::FindLevelAndBlock(int domain, int &level, int &block) const
-{
-  int gid = domain;
-  int l=0;
-
-  while(gid >= this->Levels[l].GridsPerLevel)
-    {
-    gid -= this->Levels[l].GridsPerLevel;
-    l++;
-    }
-  level = l;
-  block = gid;
-}
-
-int vtkAMRAmazeReaderInternal::GetBlockLevel(const int domain) const
-{
-  int gid = domain;
-  int l=0;
-
-  while(gid >= this->Levels[l].GridsPerLevel)
-    {
-    gid -= this->Levels[l].GridsPerLevel;
-    l++;
-    }
-  return l;
-}
-
-
-// returns the global id for the given block
-int vtkAMRAmazeReaderInternal::FindDomainId(int level, int block)
-{
-  int domain = 0;
-  for(int l=0; l < level; l++)
-    domain += this->Levels[l].GridsPerLevel;
-  domain += block;
-  if (domain >= this->NumberOfGrids)
-    cerr << "level or block too high for this dataset\n";
-  return domain;
-}
-
-void vtkAMRAmazeReaderInternal::GetSpacing(int level, double *spacing)
-{
-  int domain = this->FindDomainId(level, 0);
-  adG_grid g = this->Grids[domain];
-
-    if(GetDimensionality() == 3)  // a 3D grid
-      {
-      if(this->LengthScale)
-        {
-        spacing[2] = this->Levels[level].DXs[2] / this->LengthScaleFactor;
-        spacing[1] = this->Levels[level].DXs[1] / this->LengthScaleFactor;
-        spacing[0] = this->Levels[level].DXs[0] / this->LengthScaleFactor;
-        }
-      else
-        {
-        spacing[2] = this->Levels[level].DXs[2];
-        spacing[1] = this->Levels[level].DXs[1];
-        spacing[0] = this->Levels[level].DXs[0];
-        }
-      }
-    else
-      {
-      if(this->LengthScale)
-        {
-        spacing[2] = 0.0;
-        spacing[1] = this->Levels[level].DXs[1] / this->LengthScaleFactor;
-        spacing[0] = this->Levels[level].DXs[0] / this->LengthScaleFactor;
-        }
-      else
-        {
-        spacing[2] = 0.0;
-        spacing[1] = this->Levels[level].DXs[1];
-        spacing[0] = this->Levels[level].DXs[0];
-        }
-      }
-}
-
-void vtkAMRAmazeReaderInternal::PrintSelf(ostream& os, vtkIndent indent)
-{
-  this->Superclass::PrintSelf(os, indent);
-
-  //os << "FileName: " << (this->FileName? this->FileName:"(none)") << "\n";
-  os << "FileName: " << this->FileName  << "\n";
-  os << indent << "Dimensionality: " << this->Dimensionality << endl;
-  os << indent << "NumberOfLevels: " << this->GetNumberOfLevels() << endl;
-
-  int i, nb_of_grids=0;
-  for(i=0; i < this->NumberOfLevels; i++)
-    {
-    nb_of_grids += this->Levels[i].GridsPerLevel;
-    }
-  if(nb_of_grids != this->NumberOfGrids)
-    cerr << "mismatch between number of grids and levels\n";
-
-  for(i=0; i < this->NumberOfGrids; i++)
-    {
-    int block, level, domain;
-    this->FindLevelAndBlock(i, level, block);
-    //cout << setw(4) << i << " : level " << setw(2) << level << ", block " << setw(3) << block << endl;
-    domain = this->FindDomainId(level, block);
-    //cout << setw(4) << domain << " : level " << setw(2) << level << ", block " << setw(3) << block << endl;
-    }
-}
-
 
 vtkPolyData* vtkAMRAmazeReaderInternal::GetStar(int domain)
 {
@@ -1941,7 +1066,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
       }
     else
       {
-      cerr << "error reading Interactions::IsotrInfWind\n";
+      std::cerr << "error reading Interactions::IsotrInfWind\n";
       }
     dataset2 = H5Dopen(interactions_root_id, "Simple Accretors", H5P_DEFAULT);
     if(dataset2 >=0 )
@@ -1950,7 +1075,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
       }
     else
       {
-      cerr << "error reading Interactions::Simple Accretors\n";
+      std::cerr << "error reading Interactions::Simple Accretors\n";
       }
     H5Dclose(dataset1);
     H5Dclose(dataset2);
@@ -1983,7 +1108,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
   dataset2 = H5Dopen(models_root_id, "Stars: Present State", H5P_DEFAULT);
   if(dataset2 >=0) // old-style stars before november 6, 2008
     {
-    cerr << "vtkAMRAmazeReaderInternal::BuildStars(Old-style STARS)\n";
+    std::cerr << "vtkAMRAmazeReaderInternal::BuildStars(Old-style STARS)\n";
     dataspace = H5Dget_space(dataset2);
     status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
     this->NumberOfSphericallySymmetricStars = nb_stars = dims_out[0];
@@ -2037,8 +1162,8 @@ int vtkAMRAmazeReaderInternal::BuildStars()
           {
           if(strstr(models[j].IntActType, "Wind"))
             {
-            cerr << "found the model: " << models[j].IntActType;
-            cerr << "multiply by " << interactions[j].CompRadius << endl;
+            std::cerr << "found the model: " << models[j].IntActType;
+            std::cerr << "multiply by " << interactions[j].CompRadius << endl;
             stars[i].Radius *= interactions[j].CompRadius;
             name->SetNumberOfTuples(strlen("Wind"));
             name->SetName("Wind");
@@ -2051,8 +1176,8 @@ int vtkAMRAmazeReaderInternal::BuildStars()
           {
           if(strstr(models[j].IntActType, "Accretor"))
             {
-            cerr << "found the model: " << models[j].IntActType;
-            cerr << "multiply by " << interactions[j].CompRadius << endl;
+            std::cerr << "found the model: " << models[j].IntActType;
+            std::cerr << "multiply by " << interactions[j].CompRadius << endl;
             stars[i].Radius *= interactions[j].CompRadius;
             name->SetNumberOfTuples(strlen("Accretor"));
             name->SetName("Accretor");
@@ -2060,7 +1185,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
           }
         }
       ss->SetRadius(stars[i].Radius);
-      cerr << "radius = "<< stars[i].Radius << endl;
+      std::cerr << "radius = "<< stars[i].Radius << endl;
       ss->Update();
       for(int k=0; k < THETARES*(PHIRES-2)+2; k++)
         {
@@ -2089,7 +1214,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
 
   else if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
     {
-    cerr << "\n\n";
+    std::cerr << "\n\n";
     dataspace = H5Dget_space(StarsDS);
     status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
     nb_stars = dims_out[0];
@@ -2172,7 +1297,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
           }
         else
           {
-          cerr << "Error opening " << starname << endl;
+          std::cerr << "Error opening " << starname << endl;
           }
 
         vtkNew<vtkDoubleArray> velo;
@@ -2278,7 +1403,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
             dataspace = H5Dget_space(starN_DS);
             status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
             if(AngleResolution != dims_out[0])
-              cerr << "sanity check: NTheta resolution is mis-read?\n";
+              std::cerr << "sanity check: NTheta resolution is mis-read?\n";
 
             AngleResolution = dims_out[0];
             //std::cout << "Found phi array of size " << AngleResolution << " for " << starname << endl;
@@ -2316,13 +1441,13 @@ int vtkAMRAmazeReaderInternal::BuildStars()
             tf->Translate(0.0, 0.0, 0.0);
             tf->Scale(1.0, 1.0, 1.0);
             tf->RotateX(90.0);
-            vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
+            vtkTransformFilter *tfpd = vtkTransformFilter::New();
             tfpd->SetTransform(tf);
             tfpd->SetInputData(AxiSymStar);
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
-            this->Stars.push_back(tfpd->GetOutput());
+            this->Stars.push_back(tfpd->GetPolyDataOutput());
             }
           else if(AxisDirection == 2)
             {
@@ -2330,13 +1455,13 @@ int vtkAMRAmazeReaderInternal::BuildStars()
             tf->Translate(newstars[I].Position[0], 0.0, newstars[I].Position[0]);
             tf->Scale(1.0, 1.0, 1.0);
             tf->RotateY(90.0);
-            vtkTransformPolyDataFilter *tfpd = vtkTransformPolyDataFilter::New();
+            vtkTransformFilter *tfpd = vtkTransformFilter::New();
             tfpd->SetTransform(tf);
             tfpd->SetInputData(AxiSymStar);
             tfpd->Update();
             tf->Delete();
             AxiSymStar->Delete();
-            this->Stars.push_back(tfpd->GetOutput());
+            this->Stars.push_back(tfpd->GetPolyDataOutput());
             }
           J++;
           }
@@ -2363,3 +1488,5 @@ int vtkAMRAmazeReaderInternal::BuildStars()
 
   return nb_stars;
 }
+
+VTK_ABI_NAMESPACE_END

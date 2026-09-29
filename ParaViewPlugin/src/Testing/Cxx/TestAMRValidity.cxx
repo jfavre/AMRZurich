@@ -19,20 +19,17 @@ int main(int argc, char **argv)
     std::cerr << "missing a filename argument: Syntax ./bin/TestAMRValidity <path-to>/file.amr5 [optional output.vtkhb]\n";
     exit(1);
     }
-  std::cout << "Opening " <<  argv[1] << std::endl;
+  std::cout << "TestAMRValidity opening " <<  argv[1] << std::endl;
   reader->SetFileName(argv[1]);
   reader->DebugOn();
   reader->DataScaleOn();
-  reader->SetScaleChoice(0);
   reader->LogDataOff();
+  reader->SetPointArrayStatus("Density", 1);
+
+  reader->DebugOn();
   reader->UpdateInformation();
-  reader->DisableAll();
-  reader->Enable("Density");
-  // if we do not specify levels, should read them all
-  //reader->SetLevelRead(0, 19);
-  reader->DebugOff();
-  reader->Update();
-  
+  reader->SetMaxLevel(reader->GetNumberOfLevels());
+
   vtkOverlappingAMR* amr = nullptr;
   amr = reader->GetOutput();
   if (amr != nullptr)
@@ -42,6 +39,8 @@ int main(int argc, char **argv)
       std::cerr << "ERROR: output AMR dataset is not valid!\n";
       return 1;
     }
+    else
+      std::cerr << "this AMR dataset passed the validity check\n";
   }
   else
   {
@@ -62,5 +61,6 @@ int main(int argc, char **argv)
     return -1;
   }
   else
+    std::cerr << "clean exit()\n";
     return 0;
 }

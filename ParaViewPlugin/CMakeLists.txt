@@ -12,6 +12,13 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}"
 
 find_package(ParaView REQUIRED)
 
+set(default_build_type "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING "Choose the type of build." FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 if(PARAVIEW_USE_MPI)
   find_package(MPI)
 endif()

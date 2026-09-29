@@ -1,38 +1,58 @@
-// .NAME vtkAMRAmazeReaderInternal - Reads AMAZE AMR files (in development)
-// .SECTION Description
 
-#ifndef __vtkAMRAmazeReaderInternal_h
-#define __vtkAMRAmazeReaderInternal_h
+/**
+ * @class   vtkAMRAmazeReaderInternal
+ * @brief   Consists of the low-level Amaze Reader used by the vtkAMRAmazeReader.
+ *
+ * @sa
+ *  vtkAMRAmazeReader
+ */
+
+#ifndef vtkAMRAmazeReaderInternal_h
+#define vtkAMRAmazeReaderInternal_h
+
+#include "vtkAMRBox.h"
+#include "vtkDoubleArray.h"
+#include "vtk_hdf5.h"
+
+#include <cassert>
+#include <cstring>
+#include <map>
+#include <string>
+#include <vector>
+#include <stddef.h>
 
 class vtkPolyData;
 class vtkUniformGrid;
 class vtkRectilinearGrid;
 class vtkStructuredGrid;
+
 class vtkDoubleArray;
-class vtkDataArray;
-enum ScaleOption {pc=0, AU, RSun, NoScale};
-enum MapName     {NoMap=0, Sphere_LogR, DCR_Cart2Spheres};
-//enum Lunarity    {FULL=0, HALF=1, QUARTER=2}
-#include <vector> // Needed for vector ivar
-#include <map>
-#include <string>
 
-#include <vtk_hdf5.h>
+enum class ScaleType : int
+{
+  pc = 0,
+  AU = 1,
+  RSun = 2,
+  NoScale = 3
+};
+  
+enum class MapName : int
+{
+  NoMap = 0,
+  Sphere_LogR = 1,
+  DCR_Cart2Spheres = 2
+};
 
-#include <stddef.h>
-
-#include "vtkObject.h"
-#include "vtkAMRBox.h"
-
-#define adG_MAXDIM		3	  // maximum number of dimensions
-#define adG_NAMELENGTH	400	  // maximum length of a name string
-#define adG_PATHLENGTH	1024  // maximum length of a path string
-#define adG_LABELLENGTH	64	  // maximum length of a label string
-#define adG_UNITLENGTH	32	  // maximum length of a unit string
+constexpr int adG_MAXDIM = 3;         // maximum number of dimensions
+constexpr int adG_NAMELENGTH = 400;   // maximum length of a name string
+constexpr int adG_PATHLENGTH = 1024;  // maximum length of a path string
+constexpr int adG_LABELLENGTH = 64;   // maximum length of a label string
+constexpr int adG_UNITLENGTH = 32;    // maximum length of a unit string
 
 #define adG_BINARY		0
 #define adG_ASCII		1
 
+VTK_ABI_NAMESPACE_BEGIN
 typedef struct adG_grid_layout
   {
   int       grid_nr;                   // number of grid, part of filename
@@ -120,59 +140,19 @@ typedef struct DCR_Mapping
   int      Dimension;
 } DCR_Mapping;
 
-class vtkAMRAmazeReaderInternal: public vtkObject
+// ----------------------------------------------------------------------------
+//                     Class  vtkAmazeReaderInternal (begin)
+// ----------------------------------------------------------------------------
+
+class vtkAMRAmazeReaderInternal
 {
 public:
-  vtkTypeMacro(vtkAMRAmazeReaderInternal, vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent);
-  static vtkAMRAmazeReaderInternal* New();
 
-  //void SetFileName( const char * fileName );
-  virtual void SetFileName(VTK_FILEPATH const char* filename);
-  vtkGetFilePathMacro(FileName);
+  vtkAMRAmazeReaderInternal();
+  ~vtkAMRAmazeReaderInternal();
   
-  // Description:
-  // Get the number of components (similar to NumberOfComponents
-  // in data arrays)
-  vtkGetMacro(NumberOfComponents, int);
-
-  vtkGetMacro(NumberOfLevels, int);
-  vtkGetMacro(NumberOfGrids, int);
-
-  vtkGetMacro(Dimensionality, int);
-
-  vtkSetMacro(AMAZETime, double);
-  vtkGetMacro(AMAZETime, double);
-
-  vtkSetMacro(MaxLevelWrite, int);
-  vtkGetMacro(MaxLevelWrite, int);
-
-  // The range of valid levels values.
-  int LevelRange[2];
-  vtkGetVector2Macro(LevelRange, int);
-
-  int LevelRead[2];
-  vtkSetVector2Macro(LevelRead, int);
-  vtkGetVector2Macro(LevelRead, int);
-
-  vtkSetMacro(LogData, int);
-  vtkGetMacro(LogData, int);
-  vtkBooleanMacro(LogData, int);
-
-  vtkSetMacro(LengthScale, vtkTypeBool);
-  vtkGetMacro(LengthScale, vtkTypeBool);
-  vtkBooleanMacro(LengthScale, vtkTypeBool);
-
-  vtkSetMacro(LengthScaleFactor, double);
-  vtkGetMacro(LengthScaleFactor, double);
-
-  vtkSetMacro(DataScale, int);
-  vtkGetMacro(DataScale, int);
-  vtkBooleanMacro(DataScale, int)
-
-  vtkSetMacro(CellCentered, int);
-  vtkGetMacro(CellCentered, int);
-  vtkBooleanMacro(CellCentered, int);
+  void SetFileName(VTK_FILEPATH char* fileName) { this->FileName = fileName; }
 
   int  ReadMetaData(); // returns nb of stars
 
@@ -193,9 +173,8 @@ public:
                                  struct AxiSymStarCurrent *axiStarData,
                                  int AngleResolution);
   
-  ScaleOption            ScaleChoice;
-  int MaxLevelRead;
-  int MinLevelRead;
+  ScaleType            ScaleChoice;
+
   int NumberOfLevels;
   int NumberOfComponents;
   int NumberOfGrids;
@@ -215,23 +194,18 @@ public:
   std::map<std::string, std::string> PVlabels;
   void ReadHDF5GridsMetaData(bool);
   void MakeVariableNames();
-  vtkTypeBool LengthScale; // will automatically scale the grids to real length
-  double LengthScaleFactor;
-
-protected:
-  vtkAMRAmazeReaderInternal();
-  ~vtkAMRAmazeReaderInternal();
-  // The input file's name.
-  hid_t file_id;
-  //std::string FileName;
-  char* FileName = nullptr;
-  int LogData; // will automatically calculate log10() for Density, Temperature and Pressure
+  vtkTypeBool LengthScale{1}; // will automatically scale the grids to real length
+  double LengthScaleFactor{1.0};
   int Dimensionality;
+
+  int GridsPerLevels(int l){ return this->Levels[l].GridsPerLevel; };
+  
+protected:
+  hid_t file_id{0};
+  char* FileName{nullptr};
+  vtkTypeBool LogData{0}; // will automatically calculate log10() for Density, Temperature and Pressure
+
   int DataScale;
-
-  int CellCentered;
-
-  int MaxLevelWrite;
 
   FILE *errs;
   int ReadHDF5MetaData();
@@ -241,4 +215,9 @@ protected:
 private:
 };
 
-#endif
+// ----------------------------------------------------------------------------
+//                     Class  vtkAmazeReaderInternal ( end )
+// ----------------------------------------------------------------------------
+VTK_ABI_NAMESPACE_END
+#endif /* vtkAMRAmazeReaderInternal_h */
+// VTK-HeaderTest-Exclude: vtkAMRAmazeReaderInternal.h

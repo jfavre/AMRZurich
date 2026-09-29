@@ -14,6 +14,9 @@ paraview.simple._DisableFirstRenderCameraReset()
 materialLibrary1 = GetMaterialLibrary()
 
 renderView1 = GetRenderView()
+
+if __name__ == '__main__':
+    renderView1.ViewSize=[1920,1080]
 renderView1.Set(
     CenterOfRotation=[48596391034880.0, 50928556179456.0, 50002793594880.0],
     CameraPosition=[46728175275234.4, 47312228148177.38, 48611337824725.445],
@@ -353,5 +356,6 @@ animationScene1.Set(
 # restore active source
 SetActiveSource(glyph2)
 if __name__ == '__main__':
-  print("rendering image")
-  SaveScreenshot("StreamlinesAroundDisk.png")
+  img_fname = "StreamlinesAroundDisk.png"
+  print(f"rendering image {img_fname}")
+  SaveScreenshot(img_fname, ImageResolution=[1920,1080])

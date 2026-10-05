@@ -48,13 +48,13 @@ reader.Set(
     PointArrayStatus=['Density', 'Velocity'],
     Level=100,
 )
-
 reader.UpdatePipeline()
-Global_bounds = reader.GetDataInformation().GetBounds()
-mid_plane = [(Global_bounds[1] - Global_bounds[0]) * 0.5,
-             (Global_bounds[1] - Global_bounds[0]) * 0.5,
-             (Global_bounds[1] - Global_bounds[0]) * 0.5
-             ]
+
+Global_bounds = reader.GetDataInformation().GetBounds() # an array of [xmin, xmax, ymin, ymax, zmin, zmax]
+center_of_box = [(Global_bounds[1] - Global_bounds[0]) * 0.5,
+                 (Global_bounds[3] - Global_bounds[2]) * 0.5,
+                 (Global_bounds[5] - Global_bounds[4]) * 0.5
+                ]
              
 
 # create a new 'Contour'
@@ -63,6 +63,7 @@ contour1.Set(
     ContourBy=['POINTS', 'Density [gr/cm^3]'],
     Isosurfaces=[1e-10],
 )
+contour1.UpdatePipelineInformation()
 
 # create a new 'Mask Points'
 maskPoints1 = MaskPoints(registrationName='MaskPoints1', Input=contour1)
@@ -94,8 +95,9 @@ streamTracerWithCustomSource1.Set(
 contour2 = Contour(registrationName='Contour2', Input=streamTracerWithCustomSource1)
 contour2.Set(
     ContourBy=['POINTS', 'IntegrationTime'],
-    Isosurfaces=[-3000.0, 3000.0, -2000.0, 2000.0, -1000.0, 1000.0],
+    Isosurfaces=[-3000.0, -2000.0, -1000.0, 0.0, 1000.0, 2000.0, 3000.0],
 )
+contour2.UpdatePipelineInformation()
 
 # create a new 'Glyph'
 glyph2 = Glyph(registrationName='Glyph2', Input=contour2,
@@ -129,7 +131,7 @@ halfdomain.Invert = 0
 
 # init the 'Plane' selected for 'ClipType'
 halfdomain.ClipType.Set(
-    Origin=mid_plane,
+    Origin=center_of_box,
     Normal=[0.0, 0.0, 1.0],
 )
 
@@ -137,38 +139,22 @@ halfdomain.ClipType.Set(
 halfdomain.HyperTreeGridClipper.Origin = [50000000000000.0, 50000000000000.0, 50000000000000.0]
 
 # create a new 'Clip'
-clip3 = Clip(registrationName='Clip3', Input=halfdomain)
+clip3 = Clip(registrationName='Remove-low-density', Input=halfdomain)
 clip3.Set(
     ClipType='Scalar',
     Scalars=['POINTS', 'Density [gr/cm^3]'],
     Value=4e-14,
     Invert=0,
 )
-
-# create a new 'Clip'
-clip1 = Clip(registrationName='Clip1', Input=halfdomain)
-clip1.Set(
-    ClipType='Scalar',
-    Scalars=['POINTS', 'Density [gr/cm^3]'],
-    Value=5e-15,
-)
-
-# create a new 'Clip'
-clip2 = Clip(registrationName='Clip2', Input=clip1)
-clip2.Set(
-    ClipType='Scalar',
-    Scalars=['POINTS', 'Density [gr/cm^3]'],
-    Value=1e-15,
-    Invert=0,
-)
+clip3.UpdatePipelineInformation()
 
 # create a new 'Slice'
-slice1 = Slice(registrationName='Slice1', Input=reader)
+slice1 = Slice(registrationName='mid-box-slice', Input=reader)
 slice1.SliceOffsetValues = [0.0]
 
 # init the 'Plane' selected for 'SliceType'
 slice1.SliceType.Set(
-    Origin=[50000000000000.0, 50000000000000.0, 50000000000000.0],
+    Origin=center_of_box,
     Normal=[0.0, 0.0, 1.0],
 )
 
@@ -322,12 +308,6 @@ densitygrcm3PWF.Set(
     ScalarRangeInitialized=1,
 )
 
-# ----------------------------------------------------------------
-# setup animation scene, tracks and keyframes
-# note: the Get..() functions create a new object, if needed
-# ----------------------------------------------------------------
-
-# get time animation track
 timeAnimationCue1 = GetTimeTrack()
 
 # initialize the animation scene

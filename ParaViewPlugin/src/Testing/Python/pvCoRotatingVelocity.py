@@ -48,14 +48,10 @@ axisAlignedSlice1.CutFunction.Set(
     Normal=[0.0, 0.0, 1.0],
 )
 
-# create a new 'Programmable Filter'
-programmableFilter2 = ProgrammableFilter(registrationName='Co-Rotating Velocity', Input=axisAlignedSlice1)
-programmableFilter2.Set(
-    CopyArrays=1,
-    PythonPath='',
-    Script="""import numpy as np
+Script1 = """import numpy as np
 from vtkmodules.vtkCommonDataModel import vtkOverlappingAMR
 from vtkmodules.util.numpy_support import vtk_to_numpy, numpy_to_vtk
+import h5py
 
 ######################################################
 # define my computation for a single cartesian grid
@@ -121,9 +117,18 @@ def compute_corotating_velocity(grid, output_grid):
 # Parameters
 # ----------------------------------------------------------------------
 
-Omega = np.array([0.0, 0.0, 1.2983630952380953e-05])
-Pos_CM = np.array([1.0e+14, 1.0e+14, 1.0e+14])
+file = h5py.File("simulationdata.amr5", "r")
 
+atts_g = file["APR_StellarSystems"]["Stars"]["Stellar Orbit"]["Fixed Binary Orbit"]
+
+x, y, z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of Mass - y"], atts_g.attrs["Center of Mass - z"]
+
+omega = atts_g.attrs["Omega"]
+
+file.close()
+
+Omega = np.array([0.0, 0.0, omega])
+Pos_CM = np.array([x,y,z])
 # ----------------------------------------------------------------------
 # Input / output of the nested AMR structures
 # ----------------------------------------------------------------------
@@ -154,11 +159,23 @@ for level in range(input_amr.GetNumberOfLevels()):
         # Make a copy of the block
         output_grid = grid.NewInstance()
         output_grid.ShallowCopy(grid)
-
+        
+        Stellar_Orbit = grid.GetFieldData() #.GetArray("Fixed Binary Orbit")
+        #print(f'CM has {Stellar_Orbit.GetNumberOfArrays()} field data arrays')
+        #print(f'CM at position {Stellar_Orbit.GetTuple(0)}, {Stellar_Orbit.GetTuple(1)}, {Stellar_Orbit.GetTuple(2)}')
+        
         compute_corotating_velocity(grid, output_grid)
 
         # Put block into AMR output
-        output_amr.SetDataSet(level, block, output_grid)""",
+        output_amr.SetDataSet(level, block, output_grid)"""
+        
+Script1 = Script1.replace('simulationdata.amr5', filename)
+
+programmableFilter2 = ProgrammableFilter(registrationName='Co-Rotating Velocity', Input=axisAlignedSlice1)
+programmableFilter2.Set(
+    CopyArrays=1,
+    PythonPath='',
+    Script = Script1,
 )
 
 # create a new 'Resample To Image'

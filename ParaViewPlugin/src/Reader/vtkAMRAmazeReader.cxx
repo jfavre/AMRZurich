@@ -124,9 +124,11 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
 
 vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname ) const
 {
+  return H5Fis_hdf5(fname) > 0;
+  /*
   if (! fname )
     return false;
-    /*
+
   cout << "vtkAMRAmazeReader::CanReadFile\n";
   hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
   hid_t root_id = H5Gopen(f_id, "/", H5P_DEFAULT);
@@ -142,9 +144,9 @@ vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname ) const
     H5Fclose(f_id);
     return false;
     }
-    */return true;
+  return true;
+  */
 }
-
 
 //------------------------------------------------------------------------------
 void vtkAMRAmazeReader::PrintSelf(std::ostream& os, vtkIndent indent)

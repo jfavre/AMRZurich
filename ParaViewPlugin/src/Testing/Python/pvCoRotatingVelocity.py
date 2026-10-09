@@ -2,7 +2,7 @@
 import paraview
 paraview.compatibility.major = 6
 paraview.compatibility.minor = 1
-
+import h5py
 #### import the simple module from the paraview
 from paraview.simple import *
 #### disable automatic camera reset on 'Show'
@@ -31,6 +31,20 @@ fname = 'DATA.CX-1_M1=14.8_M2=19.2_V=750_ML=1-6_G=1.01_RBH=20RG_.NT=0000008600.T
 #filename = directory_r740gpu02 + fname
 filename = directory_JeanLaptop + fname
 
+##############################################################################
+# Read my FieldData to use later inside the ProgrammableFilter
+# These numerical values are visible from inside the ProgrammableFilter (but not from the Python shell)
+myfile = h5py.File(filename, "r")
+
+atts_g = myfile["APR_StellarSystems"]["Stars"]["Stellar Orbit"]["Fixed Binary Orbit"]
+
+CM_x, CM_y, CM_z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of Mass - y"], atts_g.attrs["Center of Mass - z"]
+
+Omega = atts_g.attrs["Omega"]
+
+myfile.close()
+##############################################################################
+
 reader = AMAZEReader(registrationName='reader', FileNames=filename)
 reader.Set(
     PointArrayStatus=['Density', 'Velocity'],
@@ -38,13 +52,19 @@ reader.Set(
 )
 reader.UpdatePipeline()
 
+Global_bounds = reader.GetDataInformation().GetBounds() # an array of [xmin, xmax, ymin, ymax, zmin, zmax]
+center_of_box = [(Global_bounds[1] - Global_bounds[0]) * 0.5,
+                 (Global_bounds[3] - Global_bounds[2]) * 0.5,
+                 (Global_bounds[5] - Global_bounds[4]) * 0.5
+                ]
+                
 # create a new 'Axis-Aligned Slice'
 axisAlignedSlice1 = AxisAlignedSlice(registrationName='AxisAlignedSlice1', Input=reader)
 axisAlignedSlice1.Level = 18
 
 # init the 'Axis Aligned Plane' selected for 'CutFunction'
 axisAlignedSlice1.CutFunction.Set(
-    Origin=[50000000000000.0, 50000000000000.0, 50000000000000.0],
+    Origin=center_of_box,
     Normal=[0.0, 0.0, 1.0],
 )
 
@@ -89,12 +109,12 @@ def compute_corotating_velocity(grid, output_grid):
         # --------------------------------------------------------------
         # Corotating velocity
         #
-        # Vcorot = V - Omega x (Coords - Pos_CM)
+        # Vcorot = V - Omega_v x (Coords - Pos_CM)
         # --------------------------------------------------------------
 
         r = coords - Pos_CM
 
-        omega_cross_r = np.cross(Omega, r)
+        omega_cross_r = np.cross(Omega_v, r)
 
         velocity_corot = velocity - omega_cross_r
 
@@ -117,18 +137,9 @@ def compute_corotating_velocity(grid, output_grid):
 # Parameters
 # ----------------------------------------------------------------------
 
-file = h5py.File("simulationdata.amr5", "r")
+Omega_v = np.array([0.0, 0.0, Omega])
+Pos_CM = np.array([CM_x, CM_y, CM_z])
 
-atts_g = file["APR_StellarSystems"]["Stars"]["Stellar Orbit"]["Fixed Binary Orbit"]
-
-x, y, z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of Mass - y"], atts_g.attrs["Center of Mass - z"]
-
-omega = atts_g.attrs["Omega"]
-
-file.close()
-
-Omega = np.array([0.0, 0.0, omega])
-Pos_CM = np.array([x,y,z])
 # ----------------------------------------------------------------------
 # Input / output of the nested AMR structures
 # ----------------------------------------------------------------------
@@ -148,9 +159,7 @@ output_amr.CopyStructure(input_amr)
 # ----------------------------------------------------------------------
 
 for level in range(input_amr.GetNumberOfLevels()):
-
     for block in range(input_amr.GetNumberOfBlocks(level)):
-
         grid = input_amr.GetDataSetAsImageData(level, block)
 
         if grid is None:
@@ -160,16 +169,10 @@ for level in range(input_amr.GetNumberOfLevels()):
         output_grid = grid.NewInstance()
         output_grid.ShallowCopy(grid)
         
-        Stellar_Orbit = grid.GetFieldData() #.GetArray("Fixed Binary Orbit")
-        #print(f'CM has {Stellar_Orbit.GetNumberOfArrays()} field data arrays')
-        #print(f'CM at position {Stellar_Orbit.GetTuple(0)}, {Stellar_Orbit.GetTuple(1)}, {Stellar_Orbit.GetTuple(2)}')
-        
         compute_corotating_velocity(grid, output_grid)
 
         # Put block into AMR output
         output_amr.SetDataSet(level, block, output_grid)"""
-        
-Script1 = Script1.replace('simulationdata.amr5', filename)
 
 programmableFilter2 = ProgrammableFilter(registrationName='Co-Rotating Velocity', Input=axisAlignedSlice1)
 programmableFilter2.Set(
@@ -197,7 +200,7 @@ VelocityGlyphs = Glyph(registrationName='Velocity Glyphs', Input=maskPoints1,
 VelocityGlyphs.Set(
     OrientationArray=['POINTS', 'Velocity [cm/s]'],
     ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=2500000000000.0,
+    ScaleFactor=2.5e12,
     GlyphMode='All Points',
 )
 
@@ -207,15 +210,15 @@ coRotatingVelocityGlyphs = Glyph(registrationName='Co-Rotating Velocity Glyphs',
 coRotatingVelocityGlyphs.Set(
     OrientationArray=['POINTS', 'Co-Rotating Velocity'],
     ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=2500000000000.0,
+    ScaleFactor=2.5e12,
     GlyphMode='All Points',
 )
 
 
-reader_1Display = Show(OutputPort(reader, 1), renderView1, 'GeometryRepresentation')
+StarsDisplay = Show(OutputPort(reader, 1), renderView1, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
-reader_1Display.Set(
+StarsDisplay.Set(
     Representation='Surface',
     ColorArrayName=['POINTS', ''],
     SelectNormalArray='Normals',

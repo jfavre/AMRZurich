@@ -47,6 +47,9 @@ CM_x, CM_y, CM_z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of M
 
 Omega = atts_g.attrs["Omega"]
 
+dset = myfile["Thermodynamics"]["Polytropic EOS"][0]
+GasConstant, MeanParticleMass = dset['Specific Gasconstant'], dset['Mean Particle Mass']
+
 myfile.close()
 ##############################################################################
 

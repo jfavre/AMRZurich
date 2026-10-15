@@ -1,7 +1,7 @@
 # state file generated using paraview version 6.2.0
 import paraview
 paraview.compatibility.major = 6
-paraview.compatibility.minor = 2
+paraview.compatibility.minor = 1
 import h5py
 #### import the simple module from the paraview
 from paraview.simple import *
@@ -73,6 +73,9 @@ CM_x, CM_y, CM_z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of M
 
 Omega = atts_g.attrs["Omega"]
 
+dset = myfile["Thermodynamics"]["Polytropic EOS"][0]
+GasConstant, MeanParticleMass = dset['Specific Gasconstant'], dset['Mean Particle Mass']
+
 myfile.close()
 ##############################################################################
 
@@ -100,8 +103,8 @@ axisAlignedSlice1.CutFunction.Set(
 )
 
 # create a new 'Programmable Filter'
-coRotatingVelocity = ProgrammableFilter(registrationName='Co-Rotating Velocity', Input=axisAlignedSlice1)
-coRotatingVelocity.Set(
+RadialVelocity = ProgrammableFilter(registrationName='Radial Velocity', Input=axisAlignedSlice1)
+RadialVelocity.Set(
     RequestInformationScript='',
     RequestUpdateExtentScript='',
     CopyArrays=1,
@@ -205,39 +208,6 @@ for level in range(input_amr.GetNumberOfLevels()):
         output_amr.SetDataSet(level, block, output_grid)""",
 )
 
-# create a new 'Resample To Image'
-resampleToImage1 = ResampleToImage(registrationName='ResampleToImage1', Input=coRotatingVelocity)
-
-# create a new 'Mask Points'
-maskPoints1 = MaskPoints(registrationName='MaskPoints1', Input=resampleToImage1)
-maskPoints1.Set(
-    OnRatio=4,
-    MaximumNumberofPoints=600,
-    RandomSampling=1,
-    RandomSamplingMode='Uniform Spatial Distribution (Bounds Based)',
-    GenerateVertices=1,
-)
-
-# create a new 'Glyph'
-coRotatingVelocityGlyphs = Glyph(registrationName='Co-Rotating Velocity Glyphs', Input=maskPoints1,
-    GlyphType='Arrow')
-coRotatingVelocityGlyphs.Set(
-    OrientationArray=['POINTS', 'Co-Rotating Velocity'],
-    ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=2500000000000.0,
-    GlyphMode='All Points',
-)
-
-# create a new 'Glyph'
-velocityGlyphs = Glyph(registrationName='Velocity Glyphs', Input=maskPoints1,
-    GlyphType='Arrow')
-velocityGlyphs.Set(
-    OrientationArray=['POINTS', 'Velocity [cm/s]'],
-    ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=2500000000000.0,
-    GlyphMode='All Points',
-)
-
 # show data from reader_1
 reader_1Display = Show(OutputPort(reader, 1), renderView1, 'GeometryRepresentation')
 
@@ -255,8 +225,8 @@ reader_1Display.ScaleTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0, 
 # init the 'Piecewise Function' selected for 'OpacityTransferFunction'
 reader_1Display.OpacityTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0, 0.5, 0.0]
 
-# show data from coRotatingVelocity
-coRotatingVelocityDisplay = Show(coRotatingVelocity, renderView1, 'AMRRepresentation')
+# show data from RadialVelocity
+RadialVelocityDisplay = Show(RadialVelocity, renderView1, 'AMRRepresentation')
 
 # get color transfer function/color map for 'RadialVelocity'
 radialVelocityLUT = GetColorTransferFunction('RadialVelocity')
@@ -270,7 +240,7 @@ radialVelocityLUT.Set(
 )
 
 # trace defaults for the display properties.
-coRotatingVelocityDisplay.Set(
+RadialVelocityDisplay.Set(
     Representation='Surface',
     ColorArrayName=['POINTS', 'Radial Velocity'],
     LookupTable=radialVelocityLUT,
@@ -278,10 +248,10 @@ coRotatingVelocityDisplay.Set(
 )
 
 # init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-coRotatingVelocityDisplay.ScaleTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
+RadialVelocityDisplay.ScaleTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
 
 # init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-coRotatingVelocityDisplay.OpacityTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
+RadialVelocityDisplay.OpacityTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
 
 # setup the color legend parameters for each legend in this view
 
@@ -297,14 +267,14 @@ radialVelocityLUTColorBar.Set(
 radialVelocityLUTColorBar.Visibility = 1
 
 # show color legend
-coRotatingVelocityDisplay.SetScalarBarVisibility(renderView1, True)
+RadialVelocityDisplay.SetScalarBarVisibility(renderView1, True)
 
 # ----------------------------------------------------------------
 # setup the visualization in view 'renderView2'
 # ----------------------------------------------------------------
 
-# show data from coRotatingVelocity
-coRotatingVelocityDisplay_1 = Show(coRotatingVelocity, renderView2, 'AMRRepresentation')
+# show data from RadialVelocity
+RadialVelocityDisplay_1 = Show(RadialVelocity, renderView2, 'AMRRepresentation')
 
 # get color transfer function/color map for 'Velocitycms'
 velocitycmsLUT = GetColorTransferFunction('Velocitycms')
@@ -327,7 +297,7 @@ velocitycmsLUT.Set(
 )
 
 # trace defaults for the display properties.
-coRotatingVelocityDisplay_1.Set(
+RadialVelocityDisplay_1.Set(
     Representation='Surface',
     ColorArrayName=['POINTS', 'Velocity [cm/s]'],
     LookupTable=velocitycmsLUT,
@@ -335,10 +305,10 @@ coRotatingVelocityDisplay_1.Set(
 )
 
 # init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-coRotatingVelocityDisplay_1.ScaleTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
+RadialVelocityDisplay_1.ScaleTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
 
 # init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-coRotatingVelocityDisplay_1.OpacityTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
+RadialVelocityDisplay_1.OpacityTransferFunction.Points = [-6660371613.680384, 0.0, 0.5, 0.0, 7294142954.603252, 1.0, 0.5, 0.0]
 
 # setup the color legend parameters for each legend in this view
 
@@ -352,7 +322,7 @@ velocitycmsLUTColorBar.Set(
 velocitycmsLUTColorBar.Visibility = 1
 
 # show color legend
-coRotatingVelocityDisplay_1.SetScalarBarVisibility(renderView2, True)
+RadialVelocityDisplay_1.SetScalarBarVisibility(renderView2, True)
 
 # ----------------------------------------------------------------
 # setup color maps and opacity maps used in the visualization
@@ -400,7 +370,7 @@ animationScene1.Set(
 
 # ----------------------------------------------------------------
 # restore active source
-SetActiveSource(coRotatingVelocity)
+SetActiveSource(RadialVelocity)
 # ----------------------------------------------------------------
 
 # ----------------------------------------------------------------

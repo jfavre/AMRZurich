@@ -1,7 +1,7 @@
 # state file generated using paraview version 6.2.0
 import paraview
 paraview.compatibility.major = 6
-paraview.compatibility.minor = 2
+paraview.compatibility.minor = 1
 import h5py
 #### import the simple module from the paraview
 from paraview.simple import *

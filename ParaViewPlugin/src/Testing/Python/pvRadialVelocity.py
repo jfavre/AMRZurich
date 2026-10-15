@@ -8,14 +8,12 @@ from paraview.simple import *
 #### disable automatic camera reset on 'Show'
 paraview.simple._DisableFirstRenderCameraReset()
 
-# ----------------------------------------------------------------
-# setup views used in the visualization
-# ----------------------------------------------------------------
-
-# Create a new 'Render View'
 renderView1 = CreateView('RenderView')
+
+import sys
+import os
+    
 renderView1.Set(
-    ViewSize=[827, 1015],
     OrientationAxesVisibility=0,
     CenterOfRotation=[50000000188416.0, 50000000188416.0, 50000000188416.0],
     CameraPosition=[50000000188416.0, 50000000188416.0, 116792085367294.34],
@@ -25,13 +23,17 @@ renderView1.Set(
 # Create a new 'Render View'
 renderView2 = CreateView('RenderView')
 renderView2.Set(
-    ViewSize=[827, 1015],
     OrientationAxesVisibility=0,
     CenterOfRotation=[50000000188416.0, 50000000188416.0, 50000000188416.0],
     CameraPosition=[50000000188416.0, 50000000188416.0, 116792085367294.34],
     CameraFocalPoint=[50000000188416.0, 50000000188416.0, -211323526086314.56],
 )
+executable = os.path.basename(sys.executable)
 
+if executable.startswith("pvbatch"):
+    renderView1.ViewSize=[1920//2,1080]
+    renderView2.ViewSize=[1920//2,1080]
+    
 SetActiveView(None)
 
 # ----------------------------------------------------------------
@@ -40,10 +42,9 @@ SetActiveView(None)
 
 # create new layout object 'Layout #1'
 layout1 = CreateLayout(name='Layout #1')
-layout1.SplitHorizontal(0, 0.500000)
+layout1.SplitHorizontal(0, 0.5)
 layout1.AssignView(1, renderView1)
 layout1.AssignView(2, renderView2)
-layout1.SetSize(1655, 1015)
 
 # ----------------------------------------------------------------
 # restore active view
@@ -108,63 +109,6 @@ coRotatingVelocity.Set(
     Script="""import numpy as np
 from vtkmodules.vtkCommonDataModel import vtkOverlappingAMR
 from vtkmodules.util.numpy_support import vtk_to_numpy, numpy_to_vtk
-
-######################################################
-# define my computation for a single cartesian grid
-def compute_corotating_velocity(grid, output_grid):
-        # --------------------------------------------------------------
-        # Get velocity
-        # --------------------------------------------------------------
-
-        velocity_vtk = grid.GetPointData().GetArray("Velocity [cm/s]")
-
-        if velocity_vtk is None:
-            raise RuntimeError(
-                f"No \'velocity\' array in AMR level {level}, block {block}"
-            )
-
-        velocity = vtk_to_numpy(velocity_vtk)
-
-        # Check dimensions
-        if velocity.ndim != 2 or velocity.shape[1] != 3:
-            raise RuntimeError(
-                f"Velocity must be N x 3, got {velocity.shape}"
-            )
-
-        # --------------------------------------------------------------
-        # Coordinates
-        # --------------------------------------------------------------
-
-        npoints = grid.GetNumberOfPoints()
-
-        coords = np.empty((npoints, 3), dtype=np.float64)
-
-        for i in range(npoints):
-            grid.GetPoint(i, coords[i])
-
-        # --------------------------------------------------------------
-        # Corotating velocity
-        #
-        # Vcorot = V - Omega_v x (Coords - Pos_CM)
-        # --------------------------------------------------------------
-
-        r = coords - Pos_CM
-
-        omega_cross_r = np.cross(Omega_v, r)
-
-        velocity_corot = velocity - omega_cross_r
-
-        # --------------------------------------------------------------
-        # Add result to output
-        # --------------------------------------------------------------
-
-        corot_vtk = numpy_to_vtk(velocity_corot, deep=True)
-
-        corot_vtk.SetName("Co-Rotating Velocity")
-
-        output_grid.GetPointData().AddArray(corot_vtk)
-        
-######################################################
 
 ######################################################
 # define my computation for a single cartesian grid
@@ -256,7 +200,6 @@ for level in range(input_amr.GetNumberOfLevels()):
         output_grid = grid.NewInstance()
         output_grid.ShallowCopy(grid)
         
-        compute_corotating_velocity(grid, output_grid)
         compute_radial_velocity(grid, output_grid)
         # Put block into AMR output
         output_amr.SetDataSet(level, block, output_grid)""",
@@ -464,3 +407,7 @@ SetActiveSource(coRotatingVelocity)
 # setup camera links
 AddCameraLink(renderView2, renderView1, 'CameraLink0')
 
+if executable.startswith("pvbatch"):
+  img_fname = "ThermalPressure.png"
+  print(f"rendering image {img_fname}")
+  SaveScreenshot(img_fname, layout1, SaveAllViews=1)

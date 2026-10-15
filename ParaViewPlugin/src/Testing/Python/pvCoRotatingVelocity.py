@@ -10,10 +10,15 @@ paraview.simple._DisableFirstRenderCameraReset()
 
 renderView1 = GetRenderView()
 
-if __name__ == '__main__':
-    renderView1.ViewSize=[1920,1080]
+import sys
+import os
+
+executable = os.path.basename(sys.executable)
+
+if executable.startswith("pvbatch"):
+    renderView1.ViewSize=[1024, 1024]
+
 renderView1.Set(
-    ViewSize=[1920, 1080],
     OrientationAxesVisibility=0,
     CenterOfRotation=[49942858301440.0, 50042690338816.0, 49960265449472.0],
     CameraPosition=[49942858301440.0, 50042690338816.0, 243438390883037.03],
@@ -71,8 +76,6 @@ axisAlignedSlice1.CutFunction.Set(
 Script1 = """import numpy as np
 from vtkmodules.vtkCommonDataModel import vtkOverlappingAMR
 from vtkmodules.util.numpy_support import vtk_to_numpy, numpy_to_vtk
-import h5py
-
 ######################################################
 # define my computation for a single cartesian grid
 def compute_corotating_velocity(grid, output_grid):
@@ -112,9 +115,9 @@ def compute_corotating_velocity(grid, output_grid):
         # Vcorot = V - Omega_v x (Coords - Pos_CM)
         # --------------------------------------------------------------
 
-        r = coords - Pos_CM
+        Radius_CM = coords - Pos_CM
 
-        omega_cross_r = np.cross(Omega_v, r)
+        omega_cross_r = np.cross(Omega_v, Radius_CM)
 
         velocity_corot = velocity - omega_cross_r
 
@@ -358,7 +361,7 @@ animationScene1.Set(
     PlayMode='Snap To TimeSteps',
 )
 
-if __name__ == '__main__':
+if executable.startswith("pvbatch"):
   img_fname = "Co-Rotating-Velocity.png"
   print(f"rendering image {img_fname}")
-  SaveScreenshot(img_fname, ImageResolution=[1920,1080])
+  SaveScreenshot(img_fname)

@@ -9,6 +9,15 @@ from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 
 renderView1 = GetRenderView()
+
+import sys
+import os
+
+executable = os.path.basename(sys.executable)
+
+if executable.startswith("pvbatch"):
+    renderView1.ViewSize=[1920,1080]
+    
 renderView1.Set(
     OrientationAxesVisibility=0,
     CenterOfRotation=[50000000188416.0, 50000000188416.0, 50000000188416.0],
@@ -83,9 +92,17 @@ def compute_thermal_pressure_from_density_and_temperature(grid, output_grid):
         # --------------------------------------------------------------
 
         density_vtk = grid.GetPointData().GetArray("Density [gr/cm^3]")
+        if density_vtk is None:
+            raise RuntimeError(
+                f"No \'Density\' array in AMR level {level}, block {block}"
+            )
         density = vtk_to_numpy(density_vtk)
         
         temperature_vtk = grid.GetPointData().GetArray("Temperature [Kelvin]")
+        if temperature_vtk is None:
+            raise RuntimeError(
+                f"No \'Temperature\' array in AMR level {level}, block {block}"
+            )
         temperature = vtk_to_numpy(temperature_vtk)
 
         thermal_pressure = density * GasConstant / MeanParticleMass * temperature
@@ -239,5 +256,8 @@ animationScene1.Set(
 # restore active source
 SetActiveSource(ThermalPressure)
 
-
+if executable.startswith("pvbatch"):
+  img_fname = "ThermalPressure.png"
+  print(f"rendering image {img_fname}")
+  SaveScreenshot(img_fname, ImageResolution=[1920,1080])
 

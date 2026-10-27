@@ -115,55 +115,68 @@ from vtkmodules.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 
 ######################################################
 # define my computation for a single cartesian grid
+
+# given a vtkImageData (with implicit coords), create the explicit coordinates array
+# to use in derived computations
+def GridCoordinates(grid):
+    npoints = grid.GetNumberOfPoints()
+        
+    extent = grid.GetExtent()
+    origin = grid.GetOrigin()
+    spacing = grid.GetSpacing()
+    ix = np.arange(extent[0], extent[1] + 1, dtype=np.float64)
+    iy = np.arange(extent[2], extent[3] + 1, dtype=np.float64)
+    iz = np.arange(extent[4], extent[5] + 1, dtype=np.float64)
+
+    # Fortran flattening makes x vary fastest, matching VTK point ordering.
+    X, Y, Z = np.meshgrid(ix, iy, iz, indexing="ij")
+    coords = np.column_stack((
+            (origin[0] + X.ravel(order="F") * spacing[0]),
+            (origin[1] + Y.ravel(order="F") * spacing[1]),
+            (origin[2] + Z.ravel(order="F") * spacing[2])))
+    if coords.shape[0] != npoints:
+        raise RuntimeError("Internal coordinate/point count mismatch")
+    return coords
+  
 def compute_radial_velocity(grid, output_grid):
-        # --------------------------------------------------------------
-        # Get velocity
-        # --------------------------------------------------------------
+    # --------------------------------------------------------------
+    # Get velocity
+    # --------------------------------------------------------------
 
-        velocity_vtk = grid.GetPointData().GetArray("Velocity [cm/s]")
+    velocity_vtk = grid.GetPointData().GetArray("Velocity [cm/s]")
 
-        if velocity_vtk is None:
-            raise RuntimeError(
-                f"No \'velocity\' array in AMR level {level}, block {block}"
-            )
+    if velocity_vtk is None:
+        raise RuntimeError(
+            f"No \'velocity\' array in AMR level {level}, block {block}"
+        )
 
-        velocity = vtk_to_numpy(velocity_vtk)
+    velocity = vtk_to_numpy(velocity_vtk)
 
-        # Check dimensions
-        if velocity.ndim != 2 or velocity.shape[1] != 3:
-            raise RuntimeError(
-                f"Velocity must be N x 3, got {velocity.shape}"
-            )
+    # Check dimensions
+    if velocity.ndim != 2 or velocity.shape[1] != 3:
+        raise RuntimeError(
+            f"Velocity must be N x 3, got {velocity.shape}")
+            
+    coords = GridCoordinates(grid)
 
-        # --------------------------------------------------------------
-        # Coordinates
-        # --------------------------------------------------------------
+    # --------------------------------------------------------------
+    # Radial Velocity (with respect to CM or BH respectively):
+    # Radius_CM= Coords-Pos_CM (Radius_BH=Coords-Pos_BH)
+    # dot(normalize(Radius_CM), Velocity)*normalize(Radius_CM)
+    # --------------------------------------------------------------
 
-        npoints = grid.GetNumberOfPoints()
+    Radius_CM = coords - Pos_CM
+    r_norm = np.linalg.norm(Radius_CM, axis=1)
+    radial_velocity = np.zeros_like(r_norm)
+    np.divide(np.sum(velocity * Radius_CM, axis=1),
+              r_norm,
+              out=radial_velocity,
+              where=r_norm > 0)
 
-        coords = np.empty((npoints, 3), dtype=np.float64)
+    radial_vtk = numpy_to_vtk(radial_velocity, deep=True)
 
-        for i in range(npoints):
-            grid.GetPoint(i, coords[i])
-
-        # --------------------------------------------------------------
-        # Radial Velocity (with respect to CM or BH respectively):
-        # Radius_CM= Coords-Pos_CM (Radius_BH=Coords-Pos_BH)
-        # dot(normalize(Radius_CM), Velocity)*normalize(Radius_CM)
-        # --------------------------------------------------------------
-
-        Radius_CM = coords - Pos_CM
-        r_norm = np.linalg.norm(Radius_CM, axis=1)
-        radial_velocity = np.zeros_like(r_norm)
-        np.divide(np.sum(velocity * Radius_CM, axis=1),
-                  r_norm,
-                  out=radial_velocity,
-                  where=r_norm > 0)
-
-        radial_vtk = numpy_to_vtk(radial_velocity, deep=True)
-
-        radial_vtk.SetName("Radial Velocity")
-        output_grid.GetPointData().AddArray(radial_vtk)
+    radial_vtk.SetName("Radial Velocity")
+    output_grid.GetPointData().AddArray(radial_vtk)
         
 ######################################################
 
@@ -360,9 +373,9 @@ animationScene1 = GetAnimationScene()
 animationScene1.Set(
     ViewModules=[renderView1, renderView2],
     Cues=timeAnimationCue1,
-    AnimationTime=682111.484339536,
-    StartTime=682111.484339536,
-    EndTime=682112.484339536,
+    AnimationTime=reader.TimestepValues[0],
+    StartTime=reader.TimestepValues[0],
+    EndTime=reader.TimestepValues[-1],
     PlayMode='Snap To TimeSteps',
 )
 
@@ -378,6 +391,6 @@ SetActiveSource(RadialVelocity)
 AddCameraLink(renderView2, renderView1, 'CameraLink0')
 
 if executable.startswith("pvbatch"):
-  img_fname = "ThermalPressure.png"
+  img_fname = "Radial-Velocity.png"
   print(f"rendering image {img_fname}")
   SaveScreenshot(img_fname, layout1, SaveAllViews=1)

@@ -38,7 +38,7 @@ filename = directory_JeanLaptop + fname
 
 reader = AMAZEReader(registrationName='reader', FileNames=filename)
 reader.Set(
-    PointArrayStatus=['Density', 'Velocity', 'Temperature'],
+    PointArrayStatus=['Density', 'Temperature'],
     Level=100,
 )
 reader.UpdatePipeline()
@@ -94,16 +94,16 @@ def compute_thermal_pressure_from_density_and_temperature(grid, output_grid):
             )
         temperature = vtk_to_numpy(temperature_vtk)
 
-        thermal_pressure = density * Specific_Gasconstant * temperature
+        thermal_pressure_D = density * Specific_Gasconstant * temperature
         
         # --------------------------------------------------------------
         # Add result to output
         # --------------------------------------------------------------
 
-        thermal_pressure_vtk = numpy_to_vtk(thermal_pressure, deep=True)
-        thermal_pressure_vtk.SetName("thermal_pressure")
+        thermal_pressure_D_vtk = numpy_to_vtk(thermal_pressure_D, deep=True)
+        thermal_pressure_D_vtk.SetName("thermal_pressure_D")
 
-        output_grid.GetPointData().AddArray(thermal_pressure_vtk)
+        output_grid.GetPointData().AddArray(thermal_pressure_D_vtk)
         
 ######################################################
 
@@ -176,7 +176,7 @@ reader_1Display.OpacityTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0
 thermalPressureDisplay = Show(ThermalPressure, renderView1, 'AMRRepresentation')
 
 # get color transfer function/color map for 'thermal_pressure'
-thermal_pressureLUT = GetColorTransferFunction('thermal_pressure')
+thermal_pressureLUT = GetColorTransferFunction('thermal_pressure_D')
 thermal_pressureLUT.Set(
     RGBPoints=[
         # scalar, red, green, blue
@@ -197,7 +197,7 @@ thermal_pressureLUT.Set(
 # trace defaults for the display properties.
 thermalPressureDisplay.Set(
     Representation='Surface',
-    ColorArrayName=['POINTS', 'thermal_pressure'],
+    ColorArrayName=['POINTS', 'thermal_pressure_D'],
     LookupTable=thermal_pressureLUT,
     Assembly='Hierarchy',
 )
@@ -213,7 +213,7 @@ thermalPressureDisplay.OpacityTransferFunction.Points = [-6660371613.680384, 0.0
 # get color legend/bar for thermal_pressureLUT in view renderView1
 thermal_pressureLUTColorBar = GetScalarBar(thermal_pressureLUT, renderView1)
 thermal_pressureLUTColorBar.Set(
-    Title='thermal_pressure',
+    Title='thermal_pressure_D',
     ComponentTitle='',
 )
 
@@ -224,7 +224,7 @@ thermal_pressureLUTColorBar.Visibility = 1
 thermalPressureDisplay.SetScalarBarVisibility(renderView1, True)
 
 # get opacity transfer function/opacity map for 'thermal_pressure'
-thermal_pressurePWF = GetOpacityTransferFunction('thermal_pressure')
+thermal_pressurePWF = GetOpacityTransferFunction('thermal_pressure_D')
 thermal_pressurePWF.Set(
     Points=[2.200546489449543e-07, 0.0, 0.5, 0.0, 98311940689.91743, 1.0, 0.5, 0.0],
     ScalarRangeInitialized=1,
@@ -260,7 +260,7 @@ animationScene1.Set(
 SetActiveSource(ThermalPressure)
 
 if executable.startswith("pvbatch"):
-  img_fname = "ThermalPressure.png"
+  img_fname = "ThermalPressure_D.png"
   print(f"rendering image {img_fname}")
   SaveScreenshot(img_fname, ImageResolution=[1920,1080])
 

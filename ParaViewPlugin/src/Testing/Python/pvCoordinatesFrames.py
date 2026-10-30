@@ -395,11 +395,8 @@ velocity_corotating_frame.Set(
 # setup the visualization in view 'renderView2'
 # ----------------------------------------------------------------
 
-# find source
-reader_1 = FindSource('reader')
-
 # show data from reader_1
-reader_1Display = Show(OutputPort(reader_1, 1), renderView2, 'GeometryRepresentation')
+reader_1Display = Show(OutputPort(reader, 1), renderView2, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
 reader_1Display.Set(
@@ -446,70 +443,39 @@ reader_1Display.PolarAxes.Set(
 # show data from extractBlock1
 extractBlock1Display = Show(extractBlock1, renderView2, 'UniformGridRepresentation')
 
-# get color transfer function/color map for 'Velocity_CM_frame'
-velocity_CM_frameLUT = GetColorTransferFunction('Velocity_CM_frame')
-velocity_CM_frameLUT.Set(
-    AutomaticRescaleRangeMode='Never',
-    RGBPoints=GenerateRGBPoints(
-        range_min=1000.0,
-        range_max=100000000.0,
-    ),
+densitygrcm3LUT = GetColorTransferFunction('Densitygrcm3')
+densitygrcm3LUT.Set(
+    RGBPoints=[
+        # scalar, red, green, blue
+        3.083465133715197e-15, 0.0564, 0.0564, 0.47,
+        5.273912119552955e-14, 0.243, 0.46035, 0.81,
+        4.305801958306158e-13, 0.356814, 0.745025, 0.954368,
+        3.930094489031055e-12, 0.6882, 0.93, 0.91791,
+        1.2081958547194573e-11, 0.899496, 0.944646, 0.768657,
+        5.201717021545207e-11, 0.957108, 0.833819, 0.508916,
+        3.6602191964106567e-10, 0.927521, 0.621439, 0.315357,
+        3.8049304864845845e-09, 0.8, 0.352, 0.16,
+        4.7340805232406797e-08, 0.59, 0.0767, 0.119475,
+    ],
+    UseLogScale=1,
     ScalarRangeInitialized=1.0,
 )
 
 # trace defaults for the display properties.
 extractBlock1Display.Set(
     Representation='Surface',
-    ColorArrayName=['POINTS', 'Velocity_CM_frame'],
-    LookupTable=velocity_CM_frameLUT,
+    ColorArrayName=['POINTS', 'Density [gr/cm^3]'],
+    LookupTable=densitygrcm3LUT,
     Assembly='Assembly',
 )
 
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-extractBlock1Display.ScaleTransferFunction.Points = [3.099390546299557e-18, 0.0, 0.5, 0.0, 1.0050345896692121e-13, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-extractBlock1Display.OpacityTransferFunction.Points = [3.099390546299557e-18, 0.0, 0.5, 0.0, 1.0050345896692121e-13, 1.0, 0.5, 0.0]
-
-# init the 'Plane' selected for 'SliceFunction'
-extractBlock1Display.SliceFunction.Origin = [50000000000000.0, 50000000000000.0, 50000000000000.0]
-
-# show data from velocity_CM_frame
-velocity_CM_frameDisplay = Show(velocity_CM_frame, renderView2, 'GeometryRepresentation')
-
-# trace defaults for the display properties.
-velocity_CM_frameDisplay.Set(
-    Representation='Surface',
-    ColorArrayName=[None, ''],
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-velocity_CM_frameDisplay.ScaleTransferFunction.Points = [4.288768885936282e-15, 0.0, 0.5, 0.0, 8.083883587512268e-12, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-velocity_CM_frameDisplay.OpacityTransferFunction.Points = [4.288768885936282e-15, 0.0, 0.5, 0.0, 8.083883587512268e-12, 1.0, 0.5, 0.0]
-
-# setup the color legend parameters for each legend in this view
-
-# get color legend/bar for velocity_CM_frameLUT in view renderView2
-velocity_CM_frameLUTColorBar = GetScalarBar(velocity_CM_frameLUT, renderView2)
-velocity_CM_frameLUTColorBar.Set(
-    Title='Velocity_CM_frame',
-    ComponentTitle='Magnitude',
-)
-
-# set color bar visibility
-velocity_CM_frameLUTColorBar.Visibility = 1
-
-# show color legend
-extractBlock1Display.SetScalarBarVisibility(renderView2, True)
 
 # ----------------------------------------------------------------
 # setup the visualization in view 'renderView3'
 # ----------------------------------------------------------------
 
 # show data from reader_1
-reader_1Display_1 = Show(OutputPort(reader_1, 1), renderView3, 'GeometryRepresentation')
+reader_1Display_1 = Show(OutputPort(reader, 1), renderView3, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
 reader_1Display_1.Set(
@@ -591,7 +557,7 @@ extractBlock1Display_1.SetScalarBarVisibility(renderView3, True)
 # ----------------------------------------------------------------
 
 # show data from reader_1
-reader_1Display_2 = Show(OutputPort(reader_1, 1), renderView4, 'GeometryRepresentation')
+reader_1Display_2 = Show(OutputPort(reader, 1), renderView4, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
 reader_1Display_2.Set(
@@ -673,7 +639,7 @@ extractBlock1Display_2.SetScalarBarVisibility(renderView4, True)
 # ----------------------------------------------------------------
 
 # show data from reader_1
-reader_1Display_3 = Show(OutputPort(reader_1, 1), renderView5, 'GeometryRepresentation')
+reader_1Display_3 = Show(OutputPort(reader, 1), renderView5, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
 reader_1Display_3.Set(
@@ -755,7 +721,7 @@ extractBlock1Display_3.SetScalarBarVisibility(renderView5, True)
 # ----------------------------------------------------------------
 
 # show data from reader_1
-reader_1Display_4 = Show(OutputPort(reader_1, 1), renderView6, 'GeometryRepresentation')
+reader_1Display_4 = Show(OutputPort(reader, 1), renderView6, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
 reader_1Display_4.Set(
@@ -837,7 +803,7 @@ extractBlock1Display_4.SetScalarBarVisibility(renderView6, True)
 # ----------------------------------------------------------------
 
 # show data from reader_1
-reader_1Display_5 = Show(OutputPort(reader_1, 1), renderView7, 'GeometryRepresentation')
+reader_1Display_5 = Show(OutputPort(reader, 1), renderView7, 'GeometryRepresentation')
 
 # trace defaults for the display properties.
 reader_1Display_5.Set(

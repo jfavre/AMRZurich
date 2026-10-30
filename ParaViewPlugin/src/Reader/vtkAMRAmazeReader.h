@@ -89,7 +89,6 @@ protected:
   int ScaleChoice;
 
   bool IsReady;
-  unsigned int MaximumLevelsToReadByDefault;
   int nbstars;
 
 private:

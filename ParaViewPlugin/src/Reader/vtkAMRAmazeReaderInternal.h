@@ -53,6 +53,16 @@ constexpr int adG_UNITLENGTH = 32;    // maximum length of a unit string
 #define adG_ASCII		1
 
 VTK_ABI_NAMESPACE_BEGIN
+
+typedef struct Polytropic_EOS
+  {
+  double Adiabatic_Exponent;
+  double Specific_Gasconstant;
+  double Scaled_Specific_Gasconstant;
+  double Scale_Factor;
+  double Mean_Particle_Mass;
+} Polytropic_EOS;
+
 typedef struct adG_grid_layout
   {
   int       grid_nr;                   // number of grid, part of filename
@@ -140,6 +150,34 @@ typedef struct DCR_Mapping
   int      Dimension;
 } DCR_Mapping;
 
+typedef struct Fixed_Binary_Orbit
+{
+  double CenterofMass_x;
+  double CenterofMass_y;
+  double CenterofMass_z;
+  double Eccentric_Anomaly;
+  double Eccentricity_Ecc;
+  double Inclination;
+  double Initial_Orbital_Angle;
+  double Initial_Phase;
+  double Initial_Time;
+  double Long_half_axis;
+  double Long_half_axis1;
+  double Long_half_axis2;
+  double Omega;
+  double Orbital_Period;
+  double Orbital_Phase;
+  double Orientation_of_Rotation;
+  double Periastron_Angle;
+  double Radius;
+  double Reduced_Mass_Star1;
+  double Reduced_Mass_Star2;
+  double Star1angle;
+  double Star1radius;
+  double Star2radius;
+  double sqrt_1_Ecc_2;
+} Fixed_Binary_Orbit;
+
 // ----------------------------------------------------------------------------
 //                     Class  vtkAmazeReaderInternal (begin)
 // ----------------------------------------------------------------------------
@@ -188,8 +226,11 @@ public:
   std::vector<adG_grid>      Grids;
   std::vector<level>         Levels;
   std::vector<vtkPolyData*>  Stars;
+  newstar                    *newstars=nullptr;
   ParamToPhysicalMapping     SphereLogRMappings[2];
   DCR_Mapping                DCR_Mappings;
+  Polytropic_EOS             polytropic_eos{};
+  Fixed_Binary_Orbit         FixedBinaryOrbit{}; // initialized to all 0.0
   std::map<std::string, int> VarNamesToLog;
   std::map<std::string, std::string> PVlabels;
   void ReadHDF5GridsMetaData(bool);
@@ -203,8 +244,7 @@ public:
 protected:
   hid_t file_id{0};
   char* FileName{nullptr};
-  vtkTypeBool LogData{0}; // will automatically calculate log10() for Density, Temperature and Pressure
-
+  vtkTypeBool LogData{0}; // will automatically calculate log10() for Density, Temperature and Pressure 
   int DataScale;
 
   FILE *errs;

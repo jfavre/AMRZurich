@@ -93,15 +93,43 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
                   vtkInformationVector* outputVector)
 {
   int status = vtkAMRBaseReader::RequestData(request, inputVector, outputVector);
-    
-  double localTime = this->Internal->AMAZETime;
-  this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
-    
+     
   // the first output holds the AMR structure
   vtkInformation* info0 = outputVector->GetInformationObject(0);
   vtkOverlappingAMR* amr = vtkOverlappingAMR::SafeDownCast(info0->Get(vtkDataObject::DATA_OBJECT()));
   bool res = amr->CheckValidity();
-
+  
+  double Omega = this->Internal->FixedBinaryOrbit.Omega; // if read from file, should never be 0.0
+  if (Omega > 0.0)
+    {
+    vtkNew<vtkDoubleArray> com;
+    com->SetName("CenterOfMass");
+    com->SetNumberOfComponents(3);
+    com->InsertNextValue(this->Internal->FixedBinaryOrbit.CenterofMass_x);
+    com->InsertNextValue(this->Internal->FixedBinaryOrbit.CenterofMass_y);
+    com->InsertNextValue(this->Internal->FixedBinaryOrbit.CenterofMass_z);
+    amr->GetFieldData()->AddArray(com);
+    vtkNew<vtkDoubleArray> omega;
+    omega->SetName("Omega");
+    omega->SetNumberOfComponents(1);
+    omega->InsertNextValue(this->Internal->FixedBinaryOrbit.Omega);
+    amr->GetFieldData()->AddArray(omega);
+    }
+  double Mean_Particle_Mass = this->Internal->polytropic_eos.Mean_Particle_Mass; // if read from file, should never be 0.0
+  if (Mean_Particle_Mass > 0.0)
+    {
+    vtkNew<vtkDoubleArray> eos;
+    eos->SetName("Polytropic_EOS");
+    eos->SetNumberOfComponents(5);
+    eos->InsertNextValue(this->Internal->polytropic_eos.Adiabatic_Exponent);
+    eos->InsertNextValue(this->Internal->polytropic_eos.Specific_Gasconstant);
+    eos->InsertNextValue(this->Internal->polytropic_eos.Scaled_Specific_Gasconstant);
+    eos->InsertNextValue(this->Internal->polytropic_eos.Scale_Factor);
+    eos->InsertNextValue(this->Internal->polytropic_eos.Mean_Particle_Mass);
+    amr->GetFieldData()->AddArray(eos);
+    }
+   
+   
   // the second output holds the Stars Polydata
   vtkInformation* info = outputVector->GetInformationObject(1);
   vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
@@ -113,6 +141,23 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
       std::cerr << "something went wrong counting stars\n";
       std::cerr << __LINE__ << "nb_stars = " << local_nb_stars << endl;
     }
+    if(this->nbstars > 0) // meta data to be used in programmable filters
+      {
+      for(auto s=0; s < this->nbstars; s++)
+        {
+        vtkNew<vtkDoubleArray> stars;
+        stars->SetName(this->Internal->newstars[s].InteractionModel);
+        stars->SetNumberOfComponents(1+3+3);
+        stars->InsertNextValue(this->Internal->newstars[s].Mass);
+        stars->InsertNextValue(this->Internal->newstars[s].Position[0]);
+        stars->InsertNextValue(this->Internal->newstars[s].Position[1]);
+        stars->InsertNextValue(this->Internal->newstars[s].Position[2]);
+        stars->InsertNextValue(this->Internal->newstars[s].Velocity[0]);
+        stars->InsertNextValue(this->Internal->newstars[s].Velocity[1]);
+        stars->InsertNextValue(this->Internal->newstars[s].Velocity[2]);
+        amr->GetFieldData()->AddArray(stars);
+        }
+      }
   }
   else
   {
@@ -120,7 +165,7 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
       output2->SetBlock(i, nullptr);
   }
   return status;
-};
+}
 
 vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname ) const
 {
@@ -277,6 +322,9 @@ int vtkAMRAmazeReader::FillMetaData()
                 );
 
   this->Metadata->GenerateParentChildInformation();
+  double localTime = this->Internal->AMAZETime;
+  this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
+ 
   return 1;
 }
 

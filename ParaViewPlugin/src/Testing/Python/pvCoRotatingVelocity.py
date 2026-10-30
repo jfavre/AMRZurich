@@ -2,7 +2,7 @@
 import paraview
 paraview.compatibility.major = 6
 paraview.compatibility.minor = 1
-import h5py
+
 #### import the simple module from the paraview
 from paraview.simple import *
 #### disable automatic camera reset on 'Show'
@@ -35,23 +35,6 @@ fname = 'DATA.CX-1_M1=14.8_M2=19.2_V=750_ML=1-6_G=1.01_RBH=20RG_.NT=0000008600.T
 
 #filename = directory_r740gpu02 + fname
 filename = directory_JeanLaptop + fname
-
-##############################################################################
-# Read my FieldData to use later inside the ProgrammableFilter
-# These numerical values are visible from inside the ProgrammableFilter (but not from the Python shell)
-myfile = h5py.File(filename, "r")
-
-atts_g = myfile["APR_StellarSystems"]["Stars"]["Stellar Orbit"]["Fixed Binary Orbit"]
-
-CM_x, CM_y, CM_z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of Mass - y"], atts_g.attrs["Center of Mass - z"]
-
-Omega = atts_g.attrs["Omega"]
-
-dset = myfile["Thermodynamics"]["Polytropic EOS"][0]
-GasConstant, MeanParticleMass = dset['Specific Gasconstant'], dset['Mean Particle Mass']
-
-myfile.close()
-##############################################################################
 
 reader = AMAZEReader(registrationName='reader', FileNames=filename)
 reader.Set(
@@ -140,13 +123,6 @@ def compute_corotating_velocity(grid, output_grid):
 ######################################################
 
 # ----------------------------------------------------------------------
-# Parameters
-# ----------------------------------------------------------------------
-
-Omega_v = np.array([0.0, 0.0, Omega])
-Pos_CM = np.array([CM_x, CM_y, CM_z])
-
-# ----------------------------------------------------------------------
 # Input / output of the nested AMR structures
 # ----------------------------------------------------------------------
 
@@ -157,6 +133,15 @@ if not isinstance(input_amr, vtkOverlappingAMR):
     raise RuntimeError(
         f"Expected vtkOverlappingAMR, got {input_amr.GetClassName()}"
     )
+
+Omega = input_amr.GetFieldData().GetArray("Omega").GetValue(0)
+Omega_v = np.array([0.0, 0.0, Omega])
+
+CM_x = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(0)
+CM_y = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(1)
+CM_z = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(2)
+
+Pos_CM = np.array([CM_x, CM_y, CM_z])
 
 output_amr.CopyStructure(input_amr)
 

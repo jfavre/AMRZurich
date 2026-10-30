@@ -206,6 +206,38 @@ static hid_t Create_SpherSymStar_Compound()
   return id;
 }
 
+static hid_t Create_FixedBinaryOrbit_Compound()
+{
+  hid_t   id = H5Tcreate(H5T_COMPOUND, sizeof(Fixed_Binary_Orbit));
+  
+  H5Tinsert(id, "CenterofMass_x",          HOFFSET(Fixed_Binary_Orbit, CenterofMass_x),          H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "CenterofMass_y",          HOFFSET(Fixed_Binary_Orbit, CenterofMass_y),          H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "CenterofMass_z",          HOFFSET(Fixed_Binary_Orbit, CenterofMass_z),          H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Eccentric_Anomaly",       HOFFSET(Fixed_Binary_Orbit, Eccentric_Anomaly),       H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Eccentricity_Ecc",        HOFFSET(Fixed_Binary_Orbit, Eccentricity_Ecc),        H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Inclination",             HOFFSET(Fixed_Binary_Orbit, Inclination),             H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Initial_Orbital_Angle",   HOFFSET(Fixed_Binary_Orbit, Initial_Orbital_Angle),   H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Initial_Phase",           HOFFSET(Fixed_Binary_Orbit, Initial_Phase),           H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Initial_Time",            HOFFSET(Fixed_Binary_Orbit, Initial_Time),            H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Long_half_axis",          HOFFSET(Fixed_Binary_Orbit, Long_half_axis),          H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Long_half_axis1",         HOFFSET(Fixed_Binary_Orbit, Long_half_axis1),         H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Long_half_axis2",         HOFFSET(Fixed_Binary_Orbit, Long_half_axis2),         H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Omega",                   HOFFSET(Fixed_Binary_Orbit, Omega),                   H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Orbital_Period",          HOFFSET(Fixed_Binary_Orbit, Orbital_Period),          H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Orbital_Phase",           HOFFSET(Fixed_Binary_Orbit, Orbital_Phase),           H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Orientation_of_Rotation", HOFFSET(Fixed_Binary_Orbit, Orientation_of_Rotation), H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Periastron_Angle",        HOFFSET(Fixed_Binary_Orbit, Periastron_Angle),        H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Radius",                  HOFFSET(Fixed_Binary_Orbit, Radius),                  H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Reduced_Mass_Star1",      HOFFSET(Fixed_Binary_Orbit, Reduced_Mass_Star1),      H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Reduced_Mass_Star2",      HOFFSET(Fixed_Binary_Orbit, Reduced_Mass_Star2),      H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Star1angle",              HOFFSET(Fixed_Binary_Orbit, Star1angle),              H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Star1radius",             HOFFSET(Fixed_Binary_Orbit, Star1radius),             H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "Star2radius",             HOFFSET(Fixed_Binary_Orbit, Star2radius),             H5T_NATIVE_DOUBLE);
+  H5Tinsert(id, "sqrt_1_Ecc_2",            HOFFSET(Fixed_Binary_Orbit, sqrt_1_Ecc_2),            H5T_NATIVE_DOUBLE);
+
+  return id;
+}
+
 vtkAMRAmazeReaderInternal::vtkAMRAmazeReaderInternal()
 {
   this->Dimensionality = 0;
@@ -385,6 +417,46 @@ void vtkAMRAmazeReaderInternal::CheckVarSize(int levelId, int block, adG_compone
     }
 }
 
+#define MAX_FLOATS 24
+
+// Structure to pass data into our attribute iterator callback
+typedef struct {
+    double values[MAX_FLOATS];
+    int count;
+} AttributeData;
+
+// Callback function executed for every attribute found in the group
+static herr_t attr_iterator(hid_t g_id, const char* attr_name, const H5A_info_t* ainfo, void* op_data) {
+    AttributeData* data = (AttributeData*)op_data;
+
+    // Stop iterating if we already found 24 floats
+    if (data->count >= MAX_FLOATS) {
+        return 1; // Returning a positive value stops the iteration successfully
+    }
+
+    // Open the current attribute by name
+    hid_t attr_id = H5Aopen(g_id, attr_name, H5P_DEFAULT);
+    if (attr_id < 0) {
+        fprintf(stderr, "Warning: Failed to open attribute %s\n", attr_name);
+        return 0; // Return 0 to skip errors and continue iterating
+    }
+
+    // Read the scalar value into our array using native float precision
+    double val;
+    herr_t status = H5Aread(attr_id, H5T_NATIVE_DOUBLE, &val);
+    
+    if (status >= 0) {
+        data->values[data->count] = val;
+        //printf("Read attribute [%s]: %f\n", attr_name, val);
+        data->count++;
+    }
+
+    // Close the attribute handle
+    H5Aclose(attr_id);
+
+    return 0; // Return 0 to continue to the next attribute
+}
+
 void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
 {
   hid_t   root_id, dataset, adG_grid_id, mapping_id, label1, label2, unitstring;
@@ -411,7 +483,7 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
       {
       H5Fclose(this->file_id);
       this->file_id = 0;
-      //cerr << "584: H5Fclose( " << this->FileName << ")\n";
+      //std::cerr << __LINE__ << " : H5Fclose( " << this->FileName << ")\n";
       }
     }
   else
@@ -489,6 +561,82 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
     //H5Gclose(level_root_id);
     //cerr << this->Levels[levelId].RefRatio << " ," << this->Levels[levelId].DXs << endl;
     }
+    // Now read the Stellar Orbit data
+  if (H5Lexists(root_id, "APR_StellarSystems", H5P_DEFAULT) > 0)
+  {
+  auto apr_root_id = H5Gopen(root_id, "APR_StellarSystems", H5P_DEFAULT);
+  if(apr_root_id >= 0)
+    {
+    auto stars_id = H5Gopen(apr_root_id, "Stars", H5P_DEFAULT);
+    if(stars_id >= 0)
+      {
+      if (H5Lexists(stars_id, "Stellar Orbit", H5P_DEFAULT) > 0)
+        {
+        auto stellar_orbit_id = H5Gopen(stars_id, "Stellar Orbit", H5P_DEFAULT);
+      
+      if(stellar_orbit_id >= 0)
+        {
+        auto fix_binary_orbit_id = H5Gopen(stellar_orbit_id, "Fixed Binary Orbit", H5P_DEFAULT);
+        if(fix_binary_orbit_id >= 0)
+          {
+          AttributeData attr_data;
+          attr_data.count = 0;
+
+          // Iterate through all attributes in the group
+          // H5_INDEX_NAME: sorts alphabetically. Use H5_INDEX_CRT_ORDER if sorted by creation time.
+          hsize_t idx = 0;
+          H5Aiterate2(fix_binary_orbit_id, H5_INDEX_NAME, H5_ITER_INC, &idx, attr_iterator, &attr_data);
+
+          // Summary of results
+          //printf("\nTotal floats successfully read: %d\n", attr_data.count);
+          if (attr_data.count < MAX_FLOATS)
+            fprintf(stderr, "Warning: Expected 24 attributes, but only found %d.\n", attr_data.count);
+          memcpy(&this->FixedBinaryOrbit, attr_data.values, sizeof(Fixed_Binary_Orbit));
+          H5Gclose(fix_binary_orbit_id);
+          }
+        H5Gclose(stellar_orbit_id);
+        }
+        }
+      H5Gclose(stars_id);
+      }
+    H5Gclose(apr_root_id);
+    }
+    } // Done reading APR_StellarSystems
+  if (H5Lexists(root_id, "Thermodynamics", H5P_DEFAULT) > 0)
+    {
+    auto thermodynamics_id = H5Gopen(root_id, "Thermodynamics", H5P_DEFAULT);
+    if(thermodynamics_id >= 0)
+      {
+      hid_t mem_type = H5Tcreate(H5T_COMPOUND, sizeof(this->polytropic_eos));
+      H5Tinsert(mem_type, "Adiabatic Exponent",          HOFFSET(Polytropic_EOS, Adiabatic_Exponent), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Specific Gasconstant",        HOFFSET(Polytropic_EOS, Specific_Gasconstant), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Scaled Specific Gasconstant", HOFFSET(Polytropic_EOS, Scaled_Specific_Gasconstant), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Scale Factor",                HOFFSET(Polytropic_EOS, Scale_Factor), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Mean Particle Mass",          HOFFSET(Polytropic_EOS, Mean_Particle_Mass), H5T_NATIVE_DOUBLE);
+
+      auto dataset = H5Dopen2(thermodynamics_id, "Polytropic EOS", H5P_DEFAULT);
+      if(dataset >= 0)
+        {
+        herr_t status = H5Dread(dataset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->polytropic_eos);
+        if (status < 0)
+          {
+          std::cerr << "Error reading Polytropic EOS\n";
+          }
+        /* else
+          {
+          std::cerr << "polytropic_eos =\t"  << "\n\t";
+          std::cerr << this->polytropic_eos.Adiabatic_Exponent<< "\n\t";
+          std::cerr << this->polytropic_eos.Specific_Gasconstant << "\n\t";
+          std::cerr << this->polytropic_eos.Scaled_Specific_Gasconstant << "\n\t";
+          std::cerr << this->polytropic_eos.Scale_Factor << "\n\t";
+          std::cerr << this->polytropic_eos.Mean_Particle_Mass << "\n\n";
+          }*/
+        H5Dclose(dataset);
+        H5Tclose(mem_type);
+        }
+      }
+    H5Gclose(thermodynamics_id);
+    } // Done reading Thermodynamics stuff if present
   H5Gclose(root_id);
 
   if((this->MappedGrids !=  MapName::NoMap) && (root_id = H5Gopen(this->file_id, "/Map", H5P_DEFAULT) )>= 0)
@@ -839,18 +987,28 @@ vtkUniformGrid* vtkAMRAmazeReaderInternal::GetAMRGrid(int blockIdx)
   dx[0] = this->Levels[levelId].DXs[0];
   dx[1] = this->Levels[levelId].DXs[1];
   dx[2] = this->Levels[levelId].DXs[2];
+/* these global data is now trully global and is made available as FieldData belonging to the root object
 
+  vtkDoubleArray *Stellar_Orbit = vtkDoubleArray::New();
+  Stellar_Orbit->SetName("Fixed Binary Orbit");
+  Stellar_Orbit->SetNumberOfComponents(1);
+  Stellar_Orbit->SetNumberOfTuples(MAX_FLOATS);
+
+  Stellar_Orbit->SetVoidArray(&this->FixedBinaryOrbit, MAX_FLOATS, 1);
+  
   vtkStringArray *sarr = vtkStringArray::New();
   sarr->SetName("GridName");
   sarr->SetNumberOfComponents(1);
   sarr->SetNumberOfTuples(1);
-  
   sarr->SetValue(0, std::format("Grid {}", grid.layout.grid_nr));
-  vtkUniformGrid* ug = vtkUniformGrid::New();
-  ug->Initialize();
   ug->GetFieldData()->AddArray(sarr);
   sarr->Delete();
-      
+  ug->GetFieldData()->AddArray(Stellar_Orbit);
+  Stellar_Orbit->Delete();
+*/
+  vtkUniformGrid* ug = vtkUniformGrid::New();
+  ug->Initialize();
+
   if(grid.layout.dimensions[2] > 1)  // a 3D grid
     {
     if(this->LengthScale)
@@ -1045,7 +1203,7 @@ int vtkAMRAmazeReaderInternal::BuildStars()
   void *client_data;
   H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
   H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
-  //cerr << "1273: H5Fopen( " << this->FileName << ")\n";
+  //cerr << __LINE__ << " : H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
   apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems", H5P_DEFAULT);
 
@@ -1103,7 +1261,6 @@ int vtkAMRAmazeReaderInternal::BuildStars()
     H5Dclose(dataset1);
     }
 
-  newstar *newstars=NULL;
   star *stars=NULL;
   dataset2 = H5Dopen(models_root_id, "Stars: Present State", H5P_DEFAULT);
   if(dataset2 >=0) // old-style stars before november 6, 2008

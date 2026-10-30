@@ -1,6 +1,5 @@
 # state file generated using paraview version 6.2.0
 import paraview
-import h5py
 
 paraview.compatibility.major = 6
 paraview.compatibility.minor = 2
@@ -107,23 +106,6 @@ fname = 'DATA.CX-1_M1=14.8_M2=19.2_V=750_ML=1-6_G=1.01_RBH=20RG_.NT=0000008600.T
 #filename = directory_r740gpu02 + fname
 filename = directory_JeanLaptop + fname
 
-##############################################################################
-# Read my FieldData to use later inside the ProgrammableFilter
-# These numerical values are visible from inside the ProgrammableFilter (but not from the Python shell)
-myfile = h5py.File(filename, "r")
-
-atts_g = myfile["APR_StellarSystems"]["Stars"]["Stellar Orbit"]["Fixed Binary Orbit"]
-
-CM_x, CM_y, CM_z = atts_g.attrs["Center of Mass - x"], atts_g.attrs["Center of Mass - y"], atts_g.attrs["Center of Mass - z"]
-
-Omega = atts_g.attrs["Omega"]
-
-dset = myfile["Thermodynamics"]["Polytropic EOS"][0]
-GasConstant, MeanParticleMass = dset['Specific Gasconstant'], dset['Mean Particle Mass']
-
-myfile.close()
-##############################################################################
-
 reader = AMAZEReader(registrationName='reader', FileNames=filename)
 reader.Set(
     PointArrayStatus=['Density', 'Velocity'],
@@ -131,13 +113,19 @@ reader.Set(
 )
 reader.UpdatePipeline()
 
+Global_bounds = reader.GetDataInformation().GetBounds() # an array of [xmin, xmax, ymin, ymax, zmin, zmax]
+center_of_box = [(Global_bounds[1] - Global_bounds[0]) * 0.5,
+                 (Global_bounds[3] - Global_bounds[2]) * 0.5,
+                 (Global_bounds[5] - Global_bounds[4]) * 0.5
+                ]
+                
 # create a new 'Axis-Aligned Slice'
 axisAlignedSlice1 = AxisAlignedSlice(registrationName='AxisAlignedSlice1', Input=reader)
 axisAlignedSlice1.Level = 18
 
 # init the 'Axis Aligned Plane' selected for 'CutFunction'
 axisAlignedSlice1.CutFunction.Set(
-    Origin=[50000000000000.0, 50000000000000.0, 50000000000000.0],
+    Origin=center_of_box,
     Normal=[0.0, 0.0, 1.0],
 )
 
@@ -156,14 +144,9 @@ VECTOR_ARRAY = "Velocity [cm/s]"       # input POINTS vector array (3 components
 OUTPUT_PREFIX = ""               # e.g. "Frame_" or "" for short names
 # Physical parameters from CoordFramesDemo.py:
 m_sun = 1.989e33
-m_BH = 14.8 * m_sun
-m_DO = 19.2 * m_sun
-d_BD = 2.99e12                   # BH--DO separation, in coordinate units
-T_orb = 5.6 * 24.0 * 3600.0
-omega = 2.0 * np.pi / T_orb
-
-Omega_v = np.array([0.0, 0.0, omega])
-p_CM = np.array([CM_x, CM_y, CM_z])
+#m_BH = 14.8 * m_sun
+#m_DO = 19.2 * m_sun
+#d_BD = 2.99e12                   # BH--DO separation, in coordinate units
 
 # ----------------------------------------------------------------------
 # Input / output of the nested AMR structures
@@ -177,16 +160,45 @@ if not isinstance(input_amr, vtkOverlappingAMR):
         f"Expected vtkOverlappingAMR, got {input_amr.GetClassName()}"
     )
 
+
+
+CM_x = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(0)
+CM_y = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(1)
+CM_z = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(2)
+
+Pos_CM = np.array([CM_x, CM_y, CM_z])
+
+# star data is available as 7 numbers (Mass, Positions[3], and Velocity[3]
+# use indexing carefully
+
+m_BH = input_amr.GetFieldData().GetArray("SimpleAccretor").GetValue(0)  * m_sun
+m_DO = input_amr.GetFieldData().GetArray("IsotrInfWind").GetValue(0)    * m_sun
+
+p_DO = np.array([input_amr.GetFieldData().GetArray("IsotrInfWind").GetValue(1),
+                      input_amr.GetFieldData().GetArray("IsotrInfWind").GetValue(2),
+                      input_amr.GetFieldData().GetArray("IsotrInfWind").GetValue(3)])
+                      
+p_BH = np.array([input_amr.GetFieldData().GetArray("SimpleAccretor").GetValue(1),
+                      input_amr.GetFieldData().GetArray("SimpleAccretor").GetValue(2),
+                      input_amr.GetFieldData().GetArray("SimpleAccretor").GetValue(3)])
+                      
+d_BD = np.linalg.norm(p_DO - p_BH)  # BH--DO separation, in coordinate units
+
 output_amr.CopyStructure(input_amr)
 output_amr.ShallowCopy(input_amr)
 
+#the following is now redundant with the above, taken from the DATA*amr5 file
+
 # Match the geometry convention in CoordFramesDemo.py.
-p_DO = p_CM.copy()
+p_DO = Pos_CM.copy()
 p_DO[0] -= m_BH * d_BD / (m_DO + m_BH)
 p_BH = p_DO.copy()
 p_BH[0] += d_BD
 
-omega_vec = np.array([0.0, 0.0, omega], dtype=np.float64)
+# use Omega read from DATA*amr5 files
+Omega = input_amr.GetFieldData().GetArray("Omega").GetValue(0)
+
+omega_vec = np.array([0.0, 0.0, Omega], dtype=np.float64)
 alpha = np.arctan2(p_BH[1] - p_DO[1], p_BH[0] - p_DO[0])
 phi_rot = alpha + 0.5 * np.pi
 cos_rot, sin_rot = np.cos(phi_rot), np.sin(phi_rot)
@@ -240,7 +252,7 @@ for level in range(input_amr.GetNumberOfLevels()):
         if coords.shape[0] != npoints:
             raise RuntimeError("Internal coordinate/point count mismatch")
 
-        CM2GP = coords - p_CM
+        CM2GP = coords - Pos_CM
         BH2GP = coords - p_BH
         DO2GP = coords - p_DO
 
@@ -280,13 +292,13 @@ for level in range(input_amr.GetNumberOfLevels()):
 
         # Corotating-system velocity fields, following the signs in the demo.
         vel_SY = np.column_stack((
-            omega * CM2GP[:, 1],
-            -omega * CM2GP[:, 0],
+            Omega * CM2GP[:, 1],
+            -Omega * CM2GP[:, 0],
             np.zeros(npoints),
         ))
         vel_DOSY = np.column_stack((
-            vel_DO[:, 0] + omega * CM2GP[:, 1],
-            vel_DO[:, 1] - omega * CM2GP[:, 0],
+            vel_DO[:, 0] + Omega * CM2GP[:, 1],
+            vel_DO[:, 1] - Omega * CM2GP[:, 0],
             vel_DO[:, 2],
         ))
 

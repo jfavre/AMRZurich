@@ -2,7 +2,7 @@
 import paraview
 paraview.compatibility.major = 6
 paraview.compatibility.minor = 1
-import h5py
+
 #### import the simple module from the paraview
 from paraview.simple import *
 #### disable automatic camera reset on 'Show'
@@ -35,17 +35,6 @@ fname = 'DATA.CX-1_M1=14.8_M2=19.2_V=750_ML=1-6_G=1.01_RBH=20RG_.NT=0000008600.T
 
 #filename = directory_r740gpu02 + fname
 filename = directory_JeanLaptop + fname
-
-##############################################################################
-# Read my FieldData to use later inside the ProgrammableFilter
-# These numerical values are visible from inside the ProgrammableFilter (but not from the Python shell)
-myfile = h5py.File(filename, "r")
-
-dset = myfile["Thermodynamics"]["Polytropic EOS"][0]
-GasConstant, MeanParticleMass = dset['Specific Gasconstant'], dset['Mean Particle Mass']
-
-myfile.close()
-##############################################################################
 
 reader = AMAZEReader(registrationName='reader', FileNames=filename)
 reader.Set(
@@ -129,6 +118,20 @@ if not isinstance(input_amr, vtkOverlappingAMR):
     raise RuntimeError(
         f"Expected vtkOverlappingAMR, got {input_amr.GetClassName()}"
     )
+
+# Polytropic_EOS data are available in that order:
+#typedef struct Polytropic_EOS
+#  {
+#  double Adiabatic_Exponent;
+#  double Specific_Gasconstant;
+#  double Scaled_Specific_Gasconstant;
+#  double Scale_Factor;
+#  double Mean_Particle_Mass;
+#} Polytropic_EOS;
+####################
+
+MeanParticleMass = input_amr.GetFieldData().GetArray("Polytropic_EOS").GetValue(4)
+GasConstant      = input_amr.GetFieldData().GetArray("Polytropic_EOS").GetValue(2)
 
 output_amr.CopyStructure(input_amr)
 

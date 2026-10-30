@@ -9,6 +9,8 @@ DEPENDS
   VTK::CommonSystem
   VTK::hdf5
   VTK::FiltersGeometry
+  VTK::FiltersGeneral
+  VTK::FiltersModeling
   VTK::FiltersSources
   VTK::InteractionStyle
 PRIVATE_DEPENDS
@@ -18,4 +20,5 @@ PRIVATE_DEPENDS
 TEST_DEPENDS
   VTK::TestingCore
   VTK::TestingRendering
+
 

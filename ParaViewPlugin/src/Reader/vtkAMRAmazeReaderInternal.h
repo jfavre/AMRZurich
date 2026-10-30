@@ -54,14 +54,14 @@ constexpr int adG_UNITLENGTH = 32;    // maximum length of a unit string
 
 VTK_ABI_NAMESPACE_BEGIN
 
-typedef struct Polytropic_EOS
+typedef struct Thermodynamics_EOS
   {
   double Adiabatic_Exponent;
   double Specific_Gasconstant;
   double Scaled_Specific_Gasconstant;
   double Scale_Factor;
   double Mean_Particle_Mass;
-} Polytropic_EOS;
+} Thermodynamics_EOS;
 
 typedef struct adG_grid_layout
   {
@@ -229,7 +229,7 @@ public:
   newstar                    *newstars=nullptr;
   ParamToPhysicalMapping     SphereLogRMappings[2];
   DCR_Mapping                DCR_Mappings;
-  Polytropic_EOS             polytropic_eos{};
+  Thermodynamics_EOS         thermodynamics_eos{};
   Fixed_Binary_Orbit         FixedBinaryOrbit{}; // initialized to all 0.0
   std::map<std::string, int> VarNamesToLog;
   std::map<std::string, std::string> PVlabels;

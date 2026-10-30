@@ -607,33 +607,62 @@ void vtkAMRAmazeReaderInternal::ReadHDF5GridsMetaData(bool shiftedGrid)
     auto thermodynamics_id = H5Gopen(root_id, "Thermodynamics", H5P_DEFAULT);
     if(thermodynamics_id >= 0)
       {
-      hid_t mem_type = H5Tcreate(H5T_COMPOUND, sizeof(this->polytropic_eos));
-      H5Tinsert(mem_type, "Adiabatic Exponent",          HOFFSET(Polytropic_EOS, Adiabatic_Exponent), H5T_NATIVE_DOUBLE);
-      H5Tinsert(mem_type, "Specific Gasconstant",        HOFFSET(Polytropic_EOS, Specific_Gasconstant), H5T_NATIVE_DOUBLE);
-      H5Tinsert(mem_type, "Scaled Specific Gasconstant", HOFFSET(Polytropic_EOS, Scaled_Specific_Gasconstant), H5T_NATIVE_DOUBLE);
-      H5Tinsert(mem_type, "Scale Factor",                HOFFSET(Polytropic_EOS, Scale_Factor), H5T_NATIVE_DOUBLE);
-      H5Tinsert(mem_type, "Mean Particle Mass",          HOFFSET(Polytropic_EOS, Mean_Particle_Mass), H5T_NATIVE_DOUBLE);
+      hid_t mem_type = H5Tcreate(H5T_COMPOUND, sizeof(this->thermodynamics_eos));
+      H5Tinsert(mem_type, "Adiabatic Exponent",          HOFFSET(Thermodynamics_EOS, Adiabatic_Exponent), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Specific Gasconstant",        HOFFSET(Thermodynamics_EOS, Specific_Gasconstant), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Scaled Specific Gasconstant", HOFFSET(Thermodynamics_EOS, Scaled_Specific_Gasconstant), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Scale Factor",                HOFFSET(Thermodynamics_EOS, Scale_Factor), H5T_NATIVE_DOUBLE);
+      H5Tinsert(mem_type, "Mean Particle Mass",          HOFFSET(Thermodynamics_EOS, Mean_Particle_Mass), H5T_NATIVE_DOUBLE);
 
-      auto dataset = H5Dopen2(thermodynamics_id, "Polytropic EOS", H5P_DEFAULT);
+      if (H5Lexists(thermodynamics_id, "Polytropic EOS", H5P_DEFAULT) > 0)
+        {
+        dataset = H5Dopen2(thermodynamics_id, "Polytropic EOS", H5P_DEFAULT);
+        
       if(dataset >= 0)
         {
-        herr_t status = H5Dread(dataset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->polytropic_eos);
+        herr_t status = H5Dread(dataset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->thermodynamics_eos);
         if (status < 0)
           {
           std::cerr << "Error reading Polytropic EOS\n";
           }
         /* else
           {
-          std::cerr << "polytropic_eos =\t"  << "\n\t";
-          std::cerr << this->polytropic_eos.Adiabatic_Exponent<< "\n\t";
-          std::cerr << this->polytropic_eos.Specific_Gasconstant << "\n\t";
-          std::cerr << this->polytropic_eos.Scaled_Specific_Gasconstant << "\n\t";
-          std::cerr << this->polytropic_eos.Scale_Factor << "\n\t";
-          std::cerr << this->polytropic_eos.Mean_Particle_Mass << "\n\n";
+          std::cerr << "thermodynamics_eos =\t"  << "\n\t";
+          std::cerr << this->thermodynamics_eos.Adiabatic_Exponent<< "\n\t";
+          std::cerr << this->thermodynamics_eos.Specific_Gasconstant << "\n\t";
+          std::cerr << this->thermodynamics_eos.Scaled_Specific_Gasconstant << "\n\t";
+          std::cerr << this->thermodynamics_eos.Scale_Factor << "\n\t";
+          std::cerr << this->thermodynamics_eos.Mean_Particle_Mass << "\n\n";
           }*/
         H5Dclose(dataset);
-        H5Tclose(mem_type);
+
         }
+        }
+        else if (H5Lexists(thermodynamics_id, "Ideal Gas EOS", H5P_DEFAULT) > 0)
+        {
+        dataset = H5Dopen2(thermodynamics_id, "Ideal Gas EOS", H5P_DEFAULT);
+        
+      if(dataset >= 0)
+        {
+        herr_t status = H5Dread(dataset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, &this->thermodynamics_eos);
+        if (status < 0)
+          {
+          std::cerr << "Error reading Ideal Gas EOS\n";
+          }
+        /* else
+          {
+          std::cerr << "thermodynamics_eos =\t"  << "\n\t";
+          std::cerr << this->thermodynamics_eos.Adiabatic_Exponent<< "\n\t";
+          std::cerr << this->thermodynamics_eos.Specific_Gasconstant << "\n\t";
+          std::cerr << this->thermodynamics_eos.Scaled_Specific_Gasconstant << "\n\t";
+          std::cerr << this->thermodynamics_eos.Scale_Factor << "\n\t";
+          std::cerr << this->thermodynamics_eos.Mean_Particle_Mass << "\n\n";
+          }*/
+        H5Dclose(dataset);
+
+        }
+        }
+        H5Tclose(mem_type);
       }
     H5Gclose(thermodynamics_id);
     } // Done reading Thermodynamics stuff if present

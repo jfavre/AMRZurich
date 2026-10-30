@@ -115,17 +115,17 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
     omega->InsertNextValue(this->Internal->FixedBinaryOrbit.Omega);
     amr->GetFieldData()->AddArray(omega);
     }
-  double Mean_Particle_Mass = this->Internal->polytropic_eos.Mean_Particle_Mass; // if read from file, should never be 0.0
+  double Mean_Particle_Mass = this->Internal->thermodynamics_eos.Mean_Particle_Mass; // if read from file, should never be 0.0
   if (Mean_Particle_Mass > 0.0)
     {
     vtkNew<vtkDoubleArray> eos;
-    eos->SetName("Polytropic_EOS");
+    eos->SetName("Thermodynamics_EOS");
     eos->SetNumberOfComponents(5);
-    eos->InsertNextValue(this->Internal->polytropic_eos.Adiabatic_Exponent);
-    eos->InsertNextValue(this->Internal->polytropic_eos.Specific_Gasconstant);
-    eos->InsertNextValue(this->Internal->polytropic_eos.Scaled_Specific_Gasconstant);
-    eos->InsertNextValue(this->Internal->polytropic_eos.Scale_Factor);
-    eos->InsertNextValue(this->Internal->polytropic_eos.Mean_Particle_Mass);
+    eos->InsertNextValue(this->Internal->thermodynamics_eos.Adiabatic_Exponent);
+    eos->InsertNextValue(this->Internal->thermodynamics_eos.Specific_Gasconstant);
+    eos->InsertNextValue(this->Internal->thermodynamics_eos.Scaled_Specific_Gasconstant);
+    eos->InsertNextValue(this->Internal->thermodynamics_eos.Scale_Factor);
+    eos->InsertNextValue(this->Internal->thermodynamics_eos.Mean_Particle_Mass);
     amr->GetFieldData()->AddArray(eos);
     }
    

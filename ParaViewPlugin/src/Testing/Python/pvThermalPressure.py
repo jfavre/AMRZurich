@@ -119,8 +119,8 @@ if not isinstance(input_amr, vtkOverlappingAMR):
         f"Expected vtkOverlappingAMR, got {input_amr.GetClassName()}"
     )
 
-# Polytropic_EOS data are available in that order:
-#typedef struct Polytropic_EOS
+# Thermodynamics_EOS data are available in that order:
+#typedef struct Thermodynamics_EOS
 #  {
 #  double Adiabatic_Exponent;
 #  double Specific_Gasconstant;
@@ -130,8 +130,8 @@ if not isinstance(input_amr, vtkOverlappingAMR):
 #} Polytropic_EOS;
 ####################
 
-MeanParticleMass = input_amr.GetFieldData().GetArray("Polytropic_EOS").GetValue(4)
-GasConstant      = input_amr.GetFieldData().GetArray("Polytropic_EOS").GetValue(2)
+MeanParticleMass = input_amr.GetFieldData().GetArray("Thermodynamics_EOS").GetValue(4)
+GasConstant      = input_amr.GetFieldData().GetArray("Thermodynamics_EOS").GetValue(2)
 
 output_amr.CopyStructure(input_amr)
 

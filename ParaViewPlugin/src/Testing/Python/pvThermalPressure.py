@@ -94,7 +94,7 @@ def compute_thermal_pressure_from_density_and_temperature(grid, output_grid):
             )
         temperature = vtk_to_numpy(temperature_vtk)
 
-        thermal_pressure = density * GasConstant / MeanParticleMass * temperature
+        thermal_pressure = density * Specific_Gasconstant * temperature
         
         # --------------------------------------------------------------
         # Add result to output
@@ -130,8 +130,8 @@ if not isinstance(input_amr, vtkOverlappingAMR):
 #} Polytropic_EOS;
 ####################
 
-MeanParticleMass = input_amr.GetFieldData().GetArray("Thermodynamics_EOS").GetValue(4)
-GasConstant      = input_amr.GetFieldData().GetArray("Thermodynamics_EOS").GetValue(2)
+MeanParticleMass          = input_amr.GetFieldData().GetArray("Thermodynamics_EOS").GetValue(4)
+Specific_Gasconstant      = input_amr.GetFieldData().GetArray("Thermodynamics_EOS").GetValue(1)
 
 output_amr.CopyStructure(input_amr)
 

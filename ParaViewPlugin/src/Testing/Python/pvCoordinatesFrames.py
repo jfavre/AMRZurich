@@ -258,10 +258,7 @@ for level in range(input_amr.GetNumberOfLevels()):
 
         # Cartesian velocities in frames translating with BH and CM.
         vel_BH = vel_DO - np.cross(
-            np.broadcast_to(omega_vec, DO2GP.shape), DO2GP - BH2GP
-        )
-        vel_CM = vel_DO - np.cross(
-            np.broadcast_to(omega_vec, DO2GP.shape), DO2GP - CM2GP
+            np.broadcast_to(omega_vec, DO2GP.shape), CM2GP - BH2GP
         )
 
         # Spherical coordinates centered at BH. Preserve the convention from
@@ -304,7 +301,6 @@ for level in range(input_amr.GetNumberOfLevels()):
 
         pd = output_grid.GetPointData()
         add_vector(pd, "Velocity_BH_frame", vel_BH)
-        add_vector(pd, "Velocity_CM_frame", vel_CM)
         add_vector(pd, "Velocity_BH_spherical", vel_BH_spherical)
         add_vector(pd, "Velocity_corotating_frame", vel_DOSY)
         add_vector(pd, "Velocity_corotation_only", vel_SY)

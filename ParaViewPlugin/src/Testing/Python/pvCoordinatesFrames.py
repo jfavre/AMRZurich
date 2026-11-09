@@ -25,29 +25,9 @@ renderView2.Set(
 )
 
 # Create a new 'Render View'
-renderView3 = CreateView('RenderView')
-renderView3.Set(
-    #ViewSize=[737, 566],
-    CenterOfRotation=[50398113038336.0, 49542537936896.0, 50000000188416.0],
-    CameraPosition=[50264423932789.664, 49678295576621.61, 57649597726338.12],
-    CameraFocalPoint=[50084221597285.12, 50019496616327.27, 47401344924361.61],
-    CameraViewUp=[-0.0009620086755001139, 0.9994452038721633, 0.033292026015822616],
-)
-
-# Create a new 'Render View'
 renderView4 = CreateView('RenderView')
 renderView4.Set(
     #ViewSize=[801, 566],
-    CenterOfRotation=[50398113038336.0, 49542537936896.0, 50000000188416.0],
-    CameraPosition=[50264423932789.664, 49678295576621.61, 57649597726338.12],
-    CameraFocalPoint=[50084221597285.12, 50019496616327.27, 47401344924361.61],
-    CameraViewUp=[-0.0009620086755001139, 0.9994452038721633, 0.033292026015822616],
-)
-
-# Create a new 'Render View'
-renderView5 = CreateView('RenderView')
-renderView5.Set(
-    #ViewSize=[737, 566],
     CenterOfRotation=[50398113038336.0, 49542537936896.0, 50000000188416.0],
     CameraPosition=[50264423932789.664, 49678295576621.61, 57649597726338.12],
     CameraFocalPoint=[50084221597285.12, 50019496616327.27, 47401344924361.61],
@@ -79,17 +59,13 @@ SetActiveView(None)
 # create new layout object 'Layout #1'
 layout1 = CreateLayout(name='Layout #1')
 layout1.SplitVertical(0, 0.500000)
-layout1.SplitHorizontal(1, 0.333333)
+layout1.SplitHorizontal(1, 0.500000)
 layout1.AssignView(3, renderView2)
-layout1.SplitHorizontal(4, 0.500000)
-layout1.AssignView(9, renderView3)
-layout1.AssignView(10, renderView4)
-layout1.SplitHorizontal(2, 0.333333)
-layout1.AssignView(5, renderView5)
-layout1.SplitHorizontal(6, 0.500000)
-layout1.AssignView(13, renderView6)
-layout1.AssignView(14, renderView7)
-layout1.SetSize(2173, 1133)
+layout1.AssignView(4, renderView4)
+layout1.SplitHorizontal(2, 0.500000)
+layout1.AssignView(5, renderView6)
+layout1.AssignView(6, renderView7)
+layout1.SetSize(1773, 980)
 # ----------------------------------------------------------------
 # restore active view
 SetActiveView(renderView2)
@@ -97,14 +73,16 @@ SetActiveView(renderView2)
 
 directory_JeanLaptop = '/local/data/Walder/CygX-1_M1=14.8_M2=19.2_V=750_ML=1-6_Gamma=1.01_RBH=20_HR/DATA/'
 directory_r740gpu02 = '/Xnfs/highenergy/rwalder/Simulations/CygX-1_M1=14.8_M2=19.2_V=750_ML=1-6_Gamma=1.01_RBH=20_HR/'
+directory_RolfLaptop ='/home/rolf/Paraview/Paraview/DATA.ToTest.Paraview/'
 
-fname = 'DATA.CX-1_M1=14.8_M2=19.2_V=750_ML=1-6_G=1.01_RBH=20RG_.NT=0000008600.Time=189.4754123165H.amr5'
+fname = 'DATA.CX-1_M1=14.8_M2=19.2_V=750_ML=1-6_G=1.01_RBH=20RG_.NT=0000008614.Time=189.4812456499H.amr5'
 
 # create a new directory name for Rolf and Doris's laptops, or use Jean's laptop, or use r740gpu02
 # watch for the last "/" in the directory name
 
 #filename = directory_r740gpu02 + fname
 filename = directory_JeanLaptop + fname
+#filename = directory_RolfLaptop + fname
 
 reader = AMAZEReader(registrationName='reader', FileNames=filename)
 reader.Set(
@@ -144,9 +122,6 @@ VECTOR_ARRAY = "Velocity [cm/s]"       # input POINTS vector array (3 components
 OUTPUT_PREFIX = ""               # e.g. "Frame_" or "" for short names
 # Physical parameters from CoordFramesDemo.py:
 m_sun = 1.989e33
-#m_BH = 14.8 * m_sun
-#m_DO = 19.2 * m_sun
-#d_BD = 2.99e12                   # BH--DO separation, in coordinate units
 
 # ----------------------------------------------------------------------
 # Input / output of the nested AMR structures
@@ -161,7 +136,7 @@ if not isinstance(input_amr, vtkOverlappingAMR):
     )
 
 
-
+# get coordinates for CM and the stars
 CM_x = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(0)
 CM_y = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(1)
 CM_z = input_amr.GetFieldData().GetArray("CenterOfMass").GetValue(2)
@@ -187,19 +162,21 @@ d_BD = np.linalg.norm(p_DO - p_BH)  # BH--DO separation, in coordinate units
 output_amr.CopyStructure(input_amr)
 output_amr.ShallowCopy(input_amr)
 
-#the following is now redundant with the above, taken from the DATA*amr5 file
-
-# Match the geometry convention in CoordFramesDemo.py.
-p_DO = Pos_CM.copy()
-p_DO[0] -= m_BH * d_BD / (m_DO + m_BH)
-p_BH = p_DO.copy()
-p_BH[0] += d_BD
-
-# use Omega read from DATA*amr5 files
+# angular velocity Omega of the rotating system - get it from DATA*amr5 files
 Omega = input_amr.GetFieldData().GetArray("Omega").GetValue(0)
 
 omega_vec = np.array([0.0, 0.0, Omega], dtype=np.float64)
+
+# compute position angle of BH in order to establish a spherical coordinate frame
+# independent of it. phi_rot is the 0-direction of the spherical system
+# pointing always in direction of the BH motion
+
+# alpha: angle between x-axis of simulation frame (SF) and 
+# line (vector) connecting from donor to BH (line goes also through CM)
+# line does not go throuh (0/0/0)!!!
+# 0.5 pi accounts for the fact that BH moves 90 degrees to that line
 alpha = np.arctan2(p_BH[1] - p_DO[1], p_BH[0] - p_DO[0])
+if (alpha<0.): alpha= alpha+2. *np.pi
 phi_rot = alpha + 0.5 * np.pi
 cos_rot, sin_rot = np.cos(phi_rot), np.sin(phi_rot)
 
@@ -208,6 +185,7 @@ def add_vector(point_data, name, values):
     arr.SetName(OUTPUT_PREFIX + name)
     arr.SetNumberOfComponents(3)
     point_data.AddArray(arr)
+
 
 for level in range(input_amr.GetNumberOfLevels()):
     for index in range(input_amr.GetNumberOfBlocks(level)):
@@ -232,7 +210,7 @@ for level in range(input_amr.GetNumberOfLevels()):
         output_grid = src.NewInstance()
         output_grid.ShallowCopy(src)
 
-        vel_DO = np.asarray(vtk_to_numpy(velocity_vtk), dtype=np.float64)
+        vel_SF = np.asarray(vtk_to_numpy(velocity_vtk), dtype=np.float64)
         npoints = src.GetNumberOfPoints()
 
         # Image point coordinates, including non-zero extents.
@@ -257,7 +235,7 @@ for level in range(input_amr.GetNumberOfLevels()):
         DO2GP = coords - p_DO
 
         # Cartesian velocities in frames translating with BH and CM.
-        vel_BH = vel_DO - np.cross(
+        vel_BH = vel_SF - np.cross(
             np.broadcast_to(omega_vec, DO2GP.shape), CM2GP - BH2GP
         )
 
@@ -271,11 +249,14 @@ for level in range(input_amr.GetNumberOfLevels()):
         theta[valid_r] = np.arccos(
             np.clip(BH2GP[valid_r, 2] / r[valid_r], -1.0, 1.0)
         )
-        phi_sf = np.arctan2(BH2GP[:, 1], BH2GP[:, 0])
-        phi = phi_sf - alpha - 0.5 * np.pi
+        phi_sf = np.arccos( BH2GP[:, 0]/ rho)
+        for ip in range(len(phi_sf)):
+            if (BH2GP[ip, 1] < 0.): phi_sf[ip]= 2.*np.pi- phi_sf[ip]
+
+        phi = phi_sf - alpha - 0.5 * np.pi   # phi = phi_sf - phi_rot
         phi = np.mod(phi, 2.0 * np.pi)
 
-        vx, vy, vz = vel_DO[:, 0], vel_DO[:, 1], vel_DO[:, 2]
+        vx, vy, vz = vel_BH[:, 0], vel_BH[:, 1], vel_BH[:, 2]
         vx_rot = vx * cos_rot + vy * sin_rot
         vy_rot = -vx * sin_rot + vy * cos_rot
         vz_rot = vz
@@ -285,31 +266,35 @@ for level in range(input_amr.GetNumberOfLevels()):
         vr = sin_theta * cos_phi * vx_rot + sin_theta * sin_phi * vy_rot + cos_theta * vz_rot
         vphi = -sin_phi * vx_rot + cos_phi * vy_rot
         vtheta = cos_theta * cos_phi * vx_rot + cos_theta * sin_phi * vy_rot - sin_theta * vz_rot
+
         vel_BH_spherical = np.column_stack((vr, vphi, vtheta))
 
         # Corotating-system velocity fields, following the signs in the demo.
-        vel_SY = np.column_stack((
-            Omega * CM2GP[:, 1],
+        vel_SYS_COROT = np.column_stack((
+             Omega * CM2GP[:, 1],
             -Omega * CM2GP[:, 0],
             np.zeros(npoints),
-        ))
-        vel_DOSY = np.column_stack((
-            vel_DO[:, 0] + Omega * CM2GP[:, 1],
-            vel_DO[:, 1] - Omega * CM2GP[:, 0],
-            vel_DO[:, 2],
+         ))
+        
+        # this is the co-rotating velocity in the simulation frame
+        #
+        vel_CoRot = np.column_stack((
+            vel_SF[:, 0] + Omega * CM2GP[:, 1],
+            vel_SF[:, 1] - Omega * CM2GP[:, 0],
+            vel_SF[:, 2],
         ))
 
         pd = output_grid.GetPointData()
         add_vector(pd, "Velocity_BH_frame", vel_BH)
         add_vector(pd, "Velocity_BH_spherical", vel_BH_spherical)
-        add_vector(pd, "Velocity_corotating_frame", vel_DOSY)
-        add_vector(pd, "Velocity_corotation_only", vel_SY)
- # Put block into AMR output
-        output_amr.SetDataSet(level, index, output_grid)
+        # add_vector(pd, "Velocity_corotating_frame", vel_CoRot)
 
+        # Put block into AMR output
+        output_amr.SetDataSet(level, index, output_grid)
 
 # Output remains vtkOverlappingAMR with the same hierarchy and per-block geometry.""",
 )
+
 
 # create a new 'Extract Block'
 extractBlock1 = ExtractBlock(registrationName='ExtractBlock1', Input=coordinatesFrames)
@@ -337,7 +322,7 @@ velocity = Glyph(registrationName='Velocity', Input=maskPoints1,
 velocity.Set(
     OrientationArray=['POINTS', 'Velocity [cm/s]'],
     ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=250000000000.0,
+    ScaleFactor=2.5e11,
     GlyphMode='All Points',
 )
 
@@ -347,29 +332,10 @@ velocity_BH_spherical = Glyph(registrationName='Velocity_BH_spherical', Input=ma
 velocity_BH_spherical.Set(
     OrientationArray=['POINTS', 'Velocity_BH_spherical'],
     ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=250000000000.0,
+    ScaleFactor=2.5e11,
     GlyphMode='All Points',
 )
 
-# create a new 'Glyph'
-velocity_CM_frame = Glyph(registrationName='Velocity_CM_frame', Input=maskPoints1,
-    GlyphType='Arrow')
-velocity_CM_frame.Set(
-    OrientationArray=['POINTS', 'Velocity_CM_frame'],
-    ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=250000000000.0,
-    GlyphMode='All Points',
-)
-
-# create a new 'Glyph'
-velocity_corotation_only = Glyph(registrationName='Velocity_corotation_only', Input=maskPoints1,
-    GlyphType='Arrow')
-velocity_corotation_only.Set(
-    OrientationArray=['POINTS', 'Velocity_corotation_only'],
-    ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=250000000000.0,
-    GlyphMode='All Points',
-)
 
 # create a new 'Glyph'
 velocity_BH_frame = Glyph(registrationName='Velocity_BH_frame', Input=maskPoints1,
@@ -377,19 +343,10 @@ velocity_BH_frame = Glyph(registrationName='Velocity_BH_frame', Input=maskPoints
 velocity_BH_frame.Set(
     OrientationArray=['POINTS', 'Velocity_BH_frame'],
     ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=250000000000.0,
+    ScaleFactor=2.5e11,
     GlyphMode='All Points',
 )
 
-# create a new 'Glyph'
-velocity_corotating_frame = Glyph(registrationName='Velocity_corotating_frame', Input=maskPoints1,
-    GlyphType='Arrow')
-velocity_corotating_frame.Set(
-    OrientationArray=['POINTS', 'Velocity_corotation_only'],
-    ScaleArray=['POINTS', 'No scale array'],
-    ScaleFactor=250000000000.0,
-    GlyphMode='All Points',
-)
 
 # ----------------------------------------------------------------
 # setup the visualization in view 'renderView2'
@@ -468,89 +425,6 @@ extractBlock1Display.Set(
     LookupTable=densitygrcm3LUT,
     Assembly='Assembly',
 )
-
-
-# ----------------------------------------------------------------
-# setup the visualization in view 'renderView3'
-# ----------------------------------------------------------------
-
-# show data from reader_1
-reader_1Display_1 = Show(OutputPort(reader, 1), renderView3, 'GeometryRepresentation')
-
-# trace defaults for the display properties.
-reader_1Display_1.Set(
-    Representation='Surface',
-    ColorArrayName=[None, ''],
-    SelectNormalArray='Normals',
-    Assembly='Hierarchy',
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-reader_1Display_1.ScaleTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-reader_1Display_1.OpacityTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0, 0.5, 0.0]
-
-# show data from extractBlock1
-extractBlock1Display_1 = Show(extractBlock1, renderView3, 'UniformGridRepresentation')
-
-# get color transfer function/color map for 'Velocity_corotating_frame'
-velocity_corotating_frameLUT = GetColorTransferFunction('Velocity_corotating_frame')
-velocity_corotating_frameLUT.Set(
-    AutomaticRescaleRangeMode='Never',
-    RGBPoints=GenerateRGBPoints(
-        range_min=7608457.51153899,
-        range_max=200000000.0,
-    ),
-    ScalarRangeInitialized=1.0,
-)
-
-# trace defaults for the display properties.
-extractBlock1Display_1.Set(
-    Representation='Surface',
-    ColorArrayName=['POINTS', 'Velocity_corotating_frame'],
-    LookupTable=velocity_corotating_frameLUT,
-    Assembly='Assembly',
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-extractBlock1Display_1.ScaleTransferFunction.Points = [3.0834651337151977e-15, 0.0, 0.5, 0.0, 7.896898444052566e-09, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-extractBlock1Display_1.OpacityTransferFunction.Points = [3.0834651337151977e-15, 0.0, 0.5, 0.0, 7.896898444052566e-09, 1.0, 0.5, 0.0]
-
-# init the 'Plane' selected for 'SliceFunction'
-extractBlock1Display_1.SliceFunction.Origin = [49781250000000.0, 50000000000000.0, 50000000000000.0]
-
-# show data from velocity_corotating_frame
-velocity_corotating_frameDisplay = Show(velocity_corotating_frame, renderView3, 'GeometryRepresentation')
-
-# trace defaults for the display properties.
-velocity_corotating_frameDisplay.Set(
-    Representation='Surface',
-    ColorArrayName=[None, ''],
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-velocity_corotating_frameDisplay.ScaleTransferFunction.Points = [4.288768885936282e-15, 0.0, 0.5, 0.0, 8.083883587512268e-12, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-velocity_corotating_frameDisplay.OpacityTransferFunction.Points = [4.288768885936282e-15, 0.0, 0.5, 0.0, 8.083883587512268e-12, 1.0, 0.5, 0.0]
-
-# setup the color legend parameters for each legend in this view
-
-# get color legend/bar for velocity_corotating_frameLUT in view renderView3
-velocity_corotating_frameLUTColorBar = GetScalarBar(velocity_corotating_frameLUT, renderView3)
-velocity_corotating_frameLUTColorBar.Set(
-    Title='Velocity_corotating_frame',
-    ComponentTitle='Magnitude',
-)
-
-# set color bar visibility
-velocity_corotating_frameLUTColorBar.Visibility = 1
-
-# show color legend
-extractBlock1Display_1.SetScalarBarVisibility(renderView3, True)
 
 # ----------------------------------------------------------------
 # setup the visualization in view 'renderView4'
@@ -633,88 +507,6 @@ velocitycmsLUTColorBar.Visibility = 1
 
 # show color legend
 extractBlock1Display_2.SetScalarBarVisibility(renderView4, True)
-
-# ----------------------------------------------------------------
-# setup the visualization in view 'renderView5'
-# ----------------------------------------------------------------
-
-# show data from reader_1
-reader_1Display_3 = Show(OutputPort(reader, 1), renderView5, 'GeometryRepresentation')
-
-# trace defaults for the display properties.
-reader_1Display_3.Set(
-    Representation='Surface',
-    ColorArrayName=[None, ''],
-    SelectNormalArray='Normals',
-    Assembly='Hierarchy',
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-reader_1Display_3.ScaleTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-reader_1Display_3.OpacityTransferFunction.Points = [14.8, 0.0, 0.5, 0.0, 19.2, 1.0, 0.5, 0.0]
-
-# show data from extractBlock1
-extractBlock1Display_3 = Show(extractBlock1, renderView5, 'UniformGridRepresentation')
-
-# get color transfer function/color map for 'Velocity_corotation_only'
-velocity_corotation_onlyLUT = GetColorTransferFunction('Velocity_corotation_only')
-velocity_corotation_onlyLUT.Set(
-    AutomaticRescaleRangeMode='Never',
-    RGBPoints=GenerateRGBPoints(
-        range_min=0.0,
-        range_max=40000000.0,
-    ),
-    ScalarRangeInitialized=1.0,
-)
-
-# trace defaults for the display properties.
-extractBlock1Display_3.Set(
-    Representation='Surface',
-    ColorArrayName=['POINTS', 'Velocity_corotation_only'],
-    LookupTable=velocity_corotation_onlyLUT,
-    Assembly='Assembly',
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-extractBlock1Display_3.ScaleTransferFunction.Points = [3.0834651337151977e-15, 0.0, 0.5, 0.0, 7.896898444052566e-09, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-extractBlock1Display_3.OpacityTransferFunction.Points = [3.0834651337151977e-15, 0.0, 0.5, 0.0, 7.896898444052566e-09, 1.0, 0.5, 0.0]
-
-# init the 'Plane' selected for 'SliceFunction'
-extractBlock1Display_3.SliceFunction.Origin = [49781250000000.0, 50000000000000.0, 50000000000000.0]
-
-# show data from velocity_corotation_only
-velocity_corotation_onlyDisplay = Show(velocity_corotation_only, renderView5, 'GeometryRepresentation')
-
-# trace defaults for the display properties.
-velocity_corotation_onlyDisplay.Set(
-    Representation='Surface',
-    ColorArrayName=[None, ''],
-)
-
-# init the 'Piecewise Function' selected for 'ScaleTransferFunction'
-velocity_corotation_onlyDisplay.ScaleTransferFunction.Points = [4.288768885936282e-15, 0.0, 0.5, 0.0, 8.083883587512268e-12, 1.0, 0.5, 0.0]
-
-# init the 'Piecewise Function' selected for 'OpacityTransferFunction'
-velocity_corotation_onlyDisplay.OpacityTransferFunction.Points = [4.288768885936282e-15, 0.0, 0.5, 0.0, 8.083883587512268e-12, 1.0, 0.5, 0.0]
-
-# setup the color legend parameters for each legend in this view
-
-# get color legend/bar for velocity_corotation_onlyLUT in view renderView5
-velocity_corotation_onlyLUTColorBar = GetScalarBar(velocity_corotation_onlyLUT, renderView5)
-velocity_corotation_onlyLUTColorBar.Set(
-    Title='Velocity_corotation_only',
-    ComponentTitle='Magnitude',
-)
-
-# set color bar visibility
-velocity_corotation_onlyLUTColorBar.Visibility = 1
-
-# show color legend
-extractBlock1Display_3.SetScalarBarVisibility(renderView5, True)
 
 # ----------------------------------------------------------------
 # setup the visualization in view 'renderView6'
@@ -950,7 +742,7 @@ animationScene1 = GetAnimationScene()
 
 # initialize the animation scene
 animationScene1.Set(
-    ViewModules=[renderView2, renderView3, renderView4, renderView5, renderView6, renderView7],
+    ViewModules=[renderView2, renderView4, renderView6, renderView7],
     Cues=timeAnimationCue1,
     AnimationTime=682111.484339536,
     StartTime=682111.484339536,
@@ -966,10 +758,6 @@ SetActiveSource(extractBlock1)
 # ----------------------------------------------------------------
 # setup camera links
 AddCameraLink(renderView2, renderView4, 'CameraLink0')
-
-AddCameraLink(renderView3, renderView2, 'CameraLink1')
-
-AddCameraLink(renderView5, renderView2, 'CameraLink2')
 
 AddCameraLink(renderView2, renderView6, 'CameraLink3')
 

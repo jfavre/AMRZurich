@@ -28,7 +28,7 @@ vtkStandardNewMacro(vtkAMRAmazeReader);
 //------------------------------------------------------------------------------
 vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
-  this->nbstars = 0;
+  this->nbstars = -1;
 
   this->DataScaleOn();
 
@@ -220,7 +220,7 @@ void vtkAMRAmazeReader::SetFileName(const char* fileName)
 
     this->IsReady = true;
     this->Internal->SetFileName(this->FileName);
-    this->LoadedMetaData = false;
+    //this->LoadedMetaData = false;
 
     this->SetUpDataArraySelections();
     this->InitializeArraySelections();
@@ -233,7 +233,8 @@ void vtkAMRAmazeReader::SetFileName(const char* fileName)
 void vtkAMRAmazeReader::ReadMetaData()
 {
   assert("pre: Internal Amaze Reader is nullptr" && (this->Internal != nullptr));
-  this->Internal->ReadMetaData();
+  if(this->Internal->ReadMetaData() >= 0)
+    this->LoadedMetaData = true;
 }
 
 //------------------------------------------------------------------------------
@@ -263,16 +264,22 @@ int vtkAMRAmazeReader::GetNumberOfLevels()
     return 0;
   }
   
-  this->Internal->ReadMetaData();
-  //std::cerr << __LINE__ << " :vtkAMRAmazeReader::GetNumberOfLevels() = " <<  this->Internal->NumberOfLevels << "\n";
+  if(!this->LoadedMetaData)
+  {
+    this->Internal->ReadMetaData();
+    this->LoadedMetaData = true;
+    //std::cerr << __LINE__ << " :vtkAMRAmazeReader::GetNumberOfLevels() setting LoadedMetaData(true)\n";
+  }
+
   return (this->Internal->NumberOfLevels);
 }
 
 //------------------------------------------------------------------------------
 int vtkAMRAmazeReader::FillMetaData()
 {
+  if(this->nbstars == -1) // has not ben executed yet
+  {
   this->nbstars = this->Internal->ReadMetaData();
-
   this->SetUpDataArraySelections();
 
   std::vector<unsigned int> blocksPerLevel;
@@ -324,8 +331,11 @@ int vtkAMRAmazeReader::FillMetaData()
   this->Metadata->GenerateParentChildInformation();
   double localTime = this->Internal->AMAZETime;
   this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
- 
+
   return 1;
+  }
+  else
+    return 1;
 }
 
 //------------------------------------------------------------------------------

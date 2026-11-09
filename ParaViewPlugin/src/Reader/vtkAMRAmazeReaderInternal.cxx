@@ -287,26 +287,28 @@ vtkAMRAmazeReaderInternal::~vtkAMRAmazeReaderInternal()
   }
 }
 
-//------------------------------------------------------------------------------
+/*---------------------------------------------------------
+  returns the number of stars, or a negative value on error
+---------------------------------------------------------*/
 int vtkAMRAmazeReaderInternal::ReadMetaData()
 {
   int levelId, GridId, i, node_veclen;
   double time, time_scalor;
-
+  //std::cout << __LINE__ << " ReadMetaData()" << "\n";
   this->Levels.clear();
   this->Labels.clear();
   if (!this->FileName || *this->FileName == 0)
     {
     //this->SetErrorCode(vtkErrorCode::NoFileNameError);
     //vtkErrorMacro(<< "Must specify adG file");
-    return 0;
+    return -1;
     }
   //cout << __LINE__ << ": H5Fopen( " << this->FileName << ")\n";
   this->file_id = H5Fopen(this->FileName, H5F_ACC_RDONLY, H5P_DEFAULT);
-  if(this->file_id<0)
+  if(this->file_id < 0)
     {
     std::cerr << "file could not be opened. Check filename " << endl;
-    return 0;
+    return -1;
     }
   auto nbstars = this->ReadHDF5MetaData();
 
@@ -820,16 +822,14 @@ void vtkAMRAmazeReaderInternal::MakeVariableNames()
     }
 }
 
+/*---------------------------------------------------------
+  returns the number of stars
+---------------------------------------------------------*/
 int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
 {
   hid_t   root_id, apr_root_id, StarsDS, models_root_id;
   hid_t   attr1;
   herr_t  status;
-// turn off error reporting
-  H5E_auto2_t func;
-  void *client_data;
-  H5Eget_auto2(H5E_DEFAULT, &func, &client_data);
-  H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
 
   root_id = H5Gopen(this->file_id, "/", H5P_DEFAULT);
 
@@ -854,7 +854,6 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
   if (status < 0)
     {
     vtkGenericWarningMacro("Failed to open Time Attribute " << endl);
-    return 0;
     }
   status = H5Aclose(attr1);
 
@@ -868,15 +867,19 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
     this->AMAZETime /= this->AMAZETimeScalor;
   status = H5Aclose(attr1);
 
-  attr1 = H5Aopen_name(root_id, "Length Scale Factor");
-  if(attr1 >0 )
-    {
-    status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->LengthScaleFactor);
-    status = H5Aclose(attr1);
-    }
-  else
-    this->LengthScaleFactor = 1.0;
+  htri_t exists = H5Aexists(root_id, "Length Scale Factor");
 
+  if (exists > 0)
+    {
+    attr1 = H5Aopen_name(root_id, "Length Scale Factor");
+    if(attr1 >= 0 )
+      {
+      status = H5Aread(attr1, H5T_NATIVE_DOUBLE, &this->LengthScaleFactor);
+      status = H5Aclose(attr1);
+      }
+    else
+      this->LengthScaleFactor = 1.0;
+    }
   switch(this->ScaleChoice)
     {
     case ScaleType::pc:
@@ -918,28 +921,29 @@ int vtkAMRAmazeReaderInternal::ReadHDF5MetaData()
     status = H5Aclose(attr1);
     status = H5Gclose(map_id);
     }
-  
-  H5Gclose(root_id);
-  
+
   int nb_stars=0;
 
-  apr_root_id = H5Gopen(this->file_id, "/APR_StellarSystems", H5P_DEFAULT);
-  models_root_id = H5Gopen(apr_root_id, "Stars", H5P_DEFAULT);
-  hid_t dataspace;
-  hsize_t dims_out[1]; // we assume rank = 1
-
-  if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
+  if(H5Lexists(root_id, "/APR_StellarSystems", H5P_DEFAULT))
     {
-    dataspace = H5Dget_space(StarsDS);
-    status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
-    nb_stars = dims_out[0];
-    H5Sclose(dataspace);
-    H5Gclose(StarsDS);
-    }
+    apr_root_id = H5Gopen(root_id, "/APR_StellarSystems", H5P_DEFAULT);
+    models_root_id = H5Gopen(apr_root_id, "Stars", H5P_DEFAULT);
+    hid_t dataspace;
+    hsize_t dims_out[1]; // we assume rank = 1
 
-  H5Gclose(models_root_id);
-  H5Gclose(apr_root_id);
-  H5Eset_auto2(H5E_DEFAULT, func, client_data);
+    if((StarsDS = H5Dopen(models_root_id, "Stars", H5P_DEFAULT)) >= 0)
+      {
+      dataspace = H5Dget_space(StarsDS);
+      status = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+      nb_stars = dims_out[0];
+      H5Sclose(dataspace);
+      H5Dclose(StarsDS);
+      }
+
+    H5Gclose(models_root_id);
+    H5Gclose(apr_root_id);
+    }
+  H5Gclose(root_id);
   return nb_stars;
 } // end of ReadHDF5MetaData()
 

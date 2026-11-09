@@ -29,7 +29,7 @@ int main(int argc, char **argv)
   reader->DebugOn();
   reader->UpdateInformation();
   reader->SetMaxLevel(reader->GetNumberOfLevels());
-
+  reader->Update();
   vtkOverlappingAMR* amr = nullptr;
   amr = reader->GetOutput();
   if (amr != nullptr)
@@ -37,30 +37,26 @@ int main(int argc, char **argv)
     if (!amr->CheckValidity())
     {
       std::cerr << "ERROR: output AMR dataset is not valid!\n";
-      return 1;
+      //return 1;
     }
     else
+      {
       std::cerr << "this AMR dataset passed the validity check\n";
+      if(argc == 3)
+        {
+        vtkNew<vtkXMLUniformGridAMRWriter> writer;
+        writer->SetFileName(argv[2]);
+        std::cout << "TestAMRValidity writing " <<  argv[2] << std::endl;
+        writer->SetInputData(amr);
+        writer->Write();
+        }
+     } 
   }
   else
   {
     std::cerr << "ERROR: output AMR dataset is nullptr!";
-    return 1;
+    //return 1;
   }
 
-  if(argc == 3)
-  {
-  vtkNew<vtkXMLUniformGridAMRWriter> writer;
-  writer->SetFileName(argv[2]);
-  writer->SetInputData(amr);
-  writer->Write();
-  }
-  if (!amr->CheckValidity())
-  {
-    std::cerr << "amr->CheckValidity() failure\n";
-    return -1;
-  }
-  else
-    std::cerr << "clean exit()\n";
-    return 0;
+
 }

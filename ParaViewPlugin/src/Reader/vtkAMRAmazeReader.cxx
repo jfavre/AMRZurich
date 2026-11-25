@@ -74,6 +74,14 @@ int vtkAMRAmazeReader::RequestInformation(vtkInformation* request,
                   vtkInformationVector** inputVector,
                   vtkInformationVector* outputVector)
 {
+  (void)request;
+  if (!this->FileName)
+  {
+    // nothing to do until a file has been selected (ParaView triggers
+    // information updates as soon as the reader proxy is created)
+    return 1;
+  }
+  
   vtkInformation* info = outputVector->GetInformationObject(0);
   
   int status = vtkAMRBaseReader::RequestInformation(request, inputVector, outputVector);

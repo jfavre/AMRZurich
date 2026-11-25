@@ -1,4 +1,3 @@
-
 /**
  * @class   vtkAMRAmazeReaderInternal
  * @brief   Consists of the low-level Amaze Reader used by the vtkAMRAmazeReader.
@@ -14,19 +13,12 @@
 #include "vtkDoubleArray.h"
 #include "vtk_hdf5.h"
 
-#include <cassert>
-#include <cstring>
 #include <map>
 #include <string>
 #include <vector>
-#include <stddef.h>
 
 class vtkPolyData;
 class vtkUniformGrid;
-class vtkRectilinearGrid;
-class vtkStructuredGrid;
-
-class vtkDoubleArray;
 
 enum class ScaleType : int
 {
@@ -35,7 +27,7 @@ enum class ScaleType : int
   RSun = 2,
   NoScale = 3
 };
-  
+
 enum class MapName : int
 {
   NoMap = 0,
@@ -43,57 +35,52 @@ enum class MapName : int
   DCR_Cart2Spheres = 2
 };
 
-constexpr int adG_MAXDIM = 3;         // maximum number of dimensions
-constexpr int adG_NAMELENGTH = 400;   // maximum length of a name string
-constexpr int adG_PATHLENGTH = 1024;  // maximum length of a path string
-constexpr int adG_LABELLENGTH = 64;   // maximum length of a label string
-constexpr int adG_UNITLENGTH = 32;    // maximum length of a unit string
-
-#define adG_BINARY		0
-#define adG_ASCII		1
+constexpr int adG_MAXDIM = 3;        // maximum number of dimensions
+constexpr int adG_LABELLENGTH = 64;  // maximum length of a label string
+constexpr int adG_UNITLENGTH = 32;   // maximum length of a unit string
 
 VTK_ABI_NAMESPACE_BEGIN
 
-typedef struct Thermodynamics_EOS
-  {
+struct Thermodynamics_EOS
+{
   double Adiabatic_Exponent;
   double Specific_Gasconstant;
   double Scaled_Specific_Gasconstant;
   double Scale_Factor;
   double Mean_Particle_Mass;
-} Thermodynamics_EOS;
+};
 
-typedef struct adG_grid_layout
-  {
-  int       grid_nr;                   // number of grid, part of filename
-  int       level;                     // level to which grid belongs
-  int       dimensions[adG_MAXDIM];    // array with nx, ny (, nz)
-  double    origin[2*adG_MAXDIM];      // min (followed by max) grid extent*/
-  int       box_corners[2*adG_MAXDIM]; // min (followed by max) grid extent in cell indices with 
-} adG_grid_layout;
+struct adG_grid_layout
+{
+  int    grid_nr;                   // number of grid, part of filename
+  int    level;                     // level to which grid belongs
+  int    dimensions[adG_MAXDIM];    // array with nx, ny (, nz)
+  double origin[2 * adG_MAXDIM];    // min (followed by max) grid extent
+  int    box_corners[2 * adG_MAXDIM]; // min (followed by max) grid extent in cell indices
+};
 
-typedef struct adG_grid
-  {
+struct adG_grid
+{
   adG_grid_layout layout;
-  vtkAMRBox amrbox;
-} adG_grid;
+  vtkAMRBox       amrbox;
+};
 
-typedef struct level
- {
- int          GridsPerLevel;
- int          RefRatio;
- double       DXs[3];
- } level;
+struct level
+{
+  int    GridsPerLevel;
+  int    RefRatio;
+  double DXs[3];
+};
 
-typedef struct adG_component
- {	
-  int           vec_len;                  // vector-length of component
-  char label[adG_LABELLENGTH];   // label of data component
-  char unit[adG_UNITLENGTH];     // unit for data component
-  float         scalefactor;              // scale-factor for component
- } adG_component;
+struct adG_component
+{
+  int   vec_len;               // vector-length of component
+  char  label[adG_LABELLENGTH];// label of data component
+  char  unit[adG_UNITLENGTH];  // unit for data component
+  float scalefactor;           // scale-factor for component
+};
 
-typedef struct AxiSymStarCurrent
+struct AxiSymStarCurrent
 {
   double Theta;
   double Radius;
@@ -102,55 +89,55 @@ typedef struct AxiSymStarCurrent
   double Epsilon;
   float  Omega[3];
   float  BField[3];
-} AxiSymStarCurrent;
+};
 
-typedef struct SpherSymStarCurrent
+struct SpherSymStarCurrent
 {
   double Radius;
   double Temperature;
   double Luminosity;
-  double  Omega[3];
-  double  BField[3];
-} SpherSymStarCurrent;
+  double Omega[3];
+  double BField[3];
+};
 
-typedef struct newstar
+struct newstar
 {
   double StarTime;
   double CompRadiusFrac;
   double Mass;
   char   SpectralType[100];
-  double  Position[3];
-  double  Velocity[3];
+  double Position[3];
+  double Velocity[3];
   char   StarModel[100];
   char   StellarEvolution[100];
   char   StarModelFileName[100];
   char   InteractionModel[100];
   char   IActionEvolution[100];
   char   IActionModelFileName[100];
-} newstar;
+};
 
-typedef struct ParamToPhysicalMapping
+struct ParamToPhysicalMapping
 {
-  char     label[15];   // label of data component
-  double   Rmin;
-  double   Rmax;
-  double   Tmin;
-  double   Tmax;
-  double   Pmin;
-  double   Pmax;
-  double   StretchFactorOBSOLETE;
-} ParamToPhysicalMapping;
+  char   label[15]; // label of data component
+  double Rmin;
+  double Rmax;
+  double Tmin;
+  double Tmax;
+  double Pmin;
+  double Pmax;
+  double StretchFactorOBSOLETE;
+};
 
-typedef struct DCR_Mapping
+struct DCR_Mapping
 {
-  double   Rmin;
-  double   Rmax;
-  char     MapCase[6];
-  char     MapLunarity[7];
-  int      Dimension;
-} DCR_Mapping;
+  double Rmin;
+  double Rmax;
+  char   MapCase[6];
+  char   MapLunarity[7];
+  int    Dimension;
+};
 
-typedef struct Fixed_Binary_Orbit
+struct Fixed_Binary_Orbit
 {
   double CenterofMass_x;
   double CenterofMass_y;
@@ -176,87 +163,82 @@ typedef struct Fixed_Binary_Orbit
   double Star1radius;
   double Star2radius;
   double sqrt_1_Ecc_2;
-} Fixed_Binary_Orbit;
+};
 
 // ----------------------------------------------------------------------------
-//                     Class  vtkAmazeReaderInternal (begin)
+//                     Class  vtkAMRAmazeReaderInternal (begin)
 // ----------------------------------------------------------------------------
 
 class vtkAMRAmazeReaderInternal
 {
 public:
-  void PrintSelf(ostream& os, vtkIndent indent);
-
   vtkAMRAmazeReaderInternal();
   ~vtkAMRAmazeReaderInternal();
-  
-  void SetFileName(VTK_FILEPATH char* fileName) { this->FileName = fileName; }
 
-  int  ReadMetaData(); // returns nb of stars
+  vtkAMRAmazeReaderInternal(const vtkAMRAmazeReaderInternal&) = delete;
+  void operator=(const vtkAMRAmazeReaderInternal&) = delete;
 
-  void FindLevelAndBlock(int domain, int &level, int &block) const;
-  int GetBlockLevel(const int domain) const;
-  int  FindDomainId(int level, int block);
-  void GetSpacing(int level, double *spacing);
+  void SetFileName(const char* fileName);
+
+  int ReadMetaData(); // returns nb of stars
+
+  int  GetBlockLevel(int domain) const;
+  void GetSpacing(int level, double* spacing);
   vtkUniformGrid* GetAMRGrid(int blockIdx);
-  vtkRectilinearGrid* ReadRectilinearGrid(int domain);
-  vtkStructuredGrid* ReadStructuredGrid(int domain);  // for Sphere_LogR
-  vtkStructuredGrid* ReadStructuredGrid2(int domain); // for DCR_Cart2Spheres
-  vtkDoubleArray* ReadVisItVar(int domain, const char *varname);
-  void CheckVarSize(int levelId, int block, adG_component &variable);
+  vtkDoubleArray* ReadVisItVar(int domain, const char* varname);
 
-  int BuildStars();
-  vtkPolyData* GetStar(int domain);
-  vtkPolyData* AxisSymStarSource(newstar *astar,
-                                 struct AxiSymStarCurrent *axiStarData,
-                                 int AngleResolution);
-  
-  ScaleType            ScaleChoice;
+  int BuildStars(); // returns nb of stars
 
-  int NumberOfLevels;
-  int NumberOfComponents;
-  int NumberOfGrids;
-  int NumberOfSphericallySymmetricStars;
-  int NumberOfAxisSymmetricStars;
-  MapName MappedGrids;
-  double AMAZETimeScalor;
-  double AMAZETime; // simulation time read from HDF5 file
+  void MakeVariableNames();
+  int  GridsPerLevels(int l) { return this->Levels[l].GridsPerLevel; }
+
+  ScaleType ScaleChoice{ScaleType::NoScale};
+
+  int    Dimensionality{0};
+  int    NumberOfLevels{0};
+  int    NumberOfComponents{0};
+  int    NumberOfGrids{0};
+  int    NumberOfSphericallySymmetricStars{0};
+  int    NumberOfAxisSymmetricStars{0};
+  MapName MappedGrids{MapName::NoMap};
+  double AMAZETimeScalor{0.0};
+  double AMAZETime{0.0}; // simulation time read from HDF5 file
 
   std::vector<adG_component> Labels;
   std::vector<adG_grid>      Grids;
   std::vector<level>         Levels;
   std::vector<vtkPolyData*>  Stars;
-  newstar                    *newstars=nullptr;
-  ParamToPhysicalMapping     SphereLogRMappings[2];
-  DCR_Mapping                DCR_Mappings;
+  std::vector<newstar>       newstars;
+  ParamToPhysicalMapping     SphereLogRMappings[2]{};
+  DCR_Mapping                DCR_Mappings{};
   Thermodynamics_EOS         thermodynamics_eos{};
   Fixed_Binary_Orbit         FixedBinaryOrbit{}; // initialized to all 0.0
-  std::map<std::string, int> VarNamesToLog;
-  std::map<std::string, std::string> PVlabels;
-  void ReadHDF5GridsMetaData(bool);
-  void MakeVariableNames();
+
   vtkTypeBool LengthScale{1}; // will automatically scale the grids to real length
-  double LengthScaleFactor{1.0};
-  int Dimensionality;
+  double      LengthScaleFactor{1.0};
 
-  int GridsPerLevels(int l){ return this->Levels[l].GridsPerLevel; };
-  
 protected:
-  hid_t file_id{0};
-  char* FileName{nullptr};
-  vtkTypeBool LogData{0}; // will automatically calculate log10() for Density, Temperature and Pressure 
-  int DataScale;
+  std::string FileName;
+  int         DataScale{1};
 
-  FILE *errs;
-  int ReadHDF5MetaData();
-  void ReadHDF5VariablesMetaData();
-  vtkDoubleArray* ReadVar(int levelId, int block, adG_component&);
+  std::map<std::string, std::string> PVlabels;
+
+  hid_t file_id{0};
 
 private:
+  void ReadHDF5GridsMetaData();
+  void ReadHDF5VariablesMetaData();
+  int  ReadHDF5MetaData(); // returns nb of stars
+
+  void FindLevelAndBlock(int domain, int& level, int& block) const;
+  int  FindDomainId(int level, int block);
+  vtkDoubleArray* ReadVar(int levelId, int block, adG_component& variable);
+  vtkPolyData* AxisSymStarSource(newstar* astar, AxiSymStarCurrent* axiStarData,
+                                 int AngleResolution);
 };
 
 // ----------------------------------------------------------------------------
-//                     Class  vtkAmazeReaderInternal ( end )
+//                     Class  vtkAMRAmazeReaderInternal ( end )
 // ----------------------------------------------------------------------------
 VTK_ABI_NAMESPACE_END
 #endif /* vtkAMRAmazeReaderInternal_h */

@@ -1,0 +1,151 @@
+"""
+Full-file regression test for the AMAZE reader.
+
+Verifies, on a real A-MAZE HDF5 file:
+1. Metadata: number of levels, blocks and the time step
+2. Array selection and per-block data reading (scalar + vector arrays)
+3. Grid geometry of the first blocks
+4. Root FieldData: binary orbit, thermodynamics EOS and star information
+5. The Stars output port, including a second UpdatePipeline (star rebuild)
+
+The data file can be overridden with the AMAZE_FULL_TEST_FILE environment
+variable. The test prints SKIP and exits with 0 when the file is absent, so
+it is safe in CTest on machines without the local data volume.
+
+Run manually with:  pvbatch TestAMAZEFullFile.py
+"""
+
+import math
+import os
+import sys
+
+from paraview.simple import *
+
+# Load the plugin (path configured by CMake generator expression)
+plugin_path = r"$<TARGET_FILE:pvAMAZEReader>"
+print(f"Loading plugin from: {plugin_path}")
+LoadPlugin(plugin_path, remote=False, ns=globals())
+
+DATA_FILE = os.environ.get("AMAZE_FULL_TEST_FILE", "").strip() or (
+    "/local/data/Walder/DATA_M1.CygX-1_M1=14.8_M2=19.2_D=2e14_V=850_ML=5-7"
+    "_Gamma=1.6666_R=256.COOL.NT=0000023158.Time=4057652.8125000000S.amr5")
+if not os.path.exists(DATA_FILE):
+    print(f"SKIP: AMAZE test file not found: {DATA_FILE}")
+    sys.exit(0)
+print(f"Using test file: {DATA_FILE}")
+
+# expected values, verified against the original reader implementation
+EXPECTED_LEVELS = 6
+EXPECTED_BLOCKS = 384
+EXPECTED_CELLS = 19805712
+EXPECTED_TIMESTEP = 4057652.8125
+EXPECTED_L0_DIMS = (31, 31, 133)
+EXPECTED_L0_SPACING = 1953125000.0
+EXPECTED_DENSITY_RANGE = (4.655599e-15, 4.926240e-15)
+
+reader = AMAZEReader(FileNames=[DATA_FILE])
+reader.UpdatePipeline()
+
+def proxy_property_list(name):
+    p = reader.SMProxy.GetProperty(name)
+    return [p.GetElement(i) for i in range(p.GetNumberOfElements())]
+
+# --- 1. metadata -------------------------------------------------------------
+time_steps = proxy_property_list("TimestepValues")
+assert len(time_steps) == 1, f"Expected 1 time step, got {len(time_steps)}"
+assert abs(time_steps[0] - EXPECTED_TIMESTEP) < 1e-3, \
+    f"Wrong time step {time_steps[0]}, expected {EXPECTED_TIMESTEP}"
+
+vtk_reader = reader.GetClientSideObject()
+output0 = vtk_reader.GetOutputDataObject(0)
+assert output0.GetClassName() == "vtkOverlappingAMR", \
+    f"Unexpected output type {output0.GetClassName()}"
+num_levels = output0.GetNumberOfLevels()
+print(f"Levels: {num_levels}")
+assert num_levels == EXPECTED_LEVELS, \
+    f"Expected {EXPECTED_LEVELS} levels, got {num_levels}"
+
+# --- 2. array selection ------------------------------------------------------
+names = proxy_property_list("PointArrayInfo")[0::2]
+print(f"Available point arrays: {list(names)}")
+wanted = [a for a in ("Density", "Velocity") if a in names]
+assert wanted == ["Density", "Velocity"], f"Missing Density/Velocity in {names}"
+reader.Set(PointArrayStatus=wanted)
+reader.UpdatePipeline()
+
+# --- 3. walk the AMR tree and count cells ------------------------------------
+total_blocks, total_cells = 0, 0
+first_block = {}
+for level in range(num_levels):
+    nb = output0.GetNumberOfBlocks(level)
+    total_blocks += nb
+    for i in range(nb):
+        block = output0.GetDataSetAsImageData(level, i)
+        if block is not None:
+            total_cells += block.GetNumberOfCells()
+            if level not in first_block:
+                first_block[level] = block
+print(f"Blocks: {total_blocks} | Cells: {total_cells}")
+assert total_blocks == EXPECTED_BLOCKS, \
+    f"Expected {EXPECTED_BLOCKS} blocks, got {total_blocks}"
+assert total_cells == EXPECTED_CELLS, \
+    f"Expected {EXPECTED_CELLS} cells, got {total_cells}"
+
+b0 = first_block[0]
+assert tuple(b0.GetDimensions()) == EXPECTED_L0_DIMS, \
+    f"Level 0 first block dims {b0.GetDimensions()} != {EXPECTED_L0_DIMS}"
+assert math.isclose(b0.GetSpacing()[0], EXPECTED_L0_SPACING, rel_tol=1e-9), \
+    f"Level 0 spacing {b0.GetSpacing()[0]} != {EXPECTED_L0_SPACING}"
+
+arrays = [b0.GetPointData().GetArrayName(i)
+          for i in range(b0.GetPointData().GetNumberOfArrays())]
+print(f"Arrays on blocks: {arrays}")
+density = b0.GetPointData().GetArray("Density [gr/cm^3]")
+velocity = b0.GetPointData().GetArray("Velocity [cm/s]")
+assert density is not None and velocity is not None, \
+    "Selected arrays were not added to the blocks"
+assert velocity.GetNumberOfComponents() == 3, "Velocity must have 3 components"
+
+rng = density.GetRange(0)
+print(f"Density range: [{rng[0]:.6e}, {rng[1]:.6e}]")
+assert all(math.isfinite(v) for v in rng), "non-finite Density range"
+for got, want in zip(rng, EXPECTED_DENSITY_RANGE):
+    assert math.isclose(got, want, rel_tol=1e-5), \
+        f"Density range {rng} != {EXPECTED_DENSITY_RANGE}"
+
+# --- 4. root FieldData -------------------------------------------------------
+fd = output0.GetFieldData()
+fd_names = [fd.GetArrayName(i) for i in range(fd.GetNumberOfArrays())]
+print(f"Root FieldData: {fd_names}")
+for expected in ("CenterOfMass", "Omega", "Thermodynamics_EOS"):
+    assert expected in fd_names, f"Missing {expected} in root FieldData"
+
+# --- 5. stars output ----------------------------------------------------------
+output1 = vtk_reader.GetOutputDataObject(1)
+assert output1.GetClassName() == "vtkMultiBlockDataSet"
+num_stars = output1.GetNumberOfBlocks()
+print(f"Stars: {num_stars}")
+assert num_stars == 2, f"Expected 2 stars, got {num_stars}"
+
+valid_polys = 0
+star_polys = []
+for i in range(num_stars):
+    star = output1.GetDataSet(i)
+    star_polys.append(0 if star is None else star.GetNumberOfPolys())
+    valid_polys += star_polys[-1]
+# NOTE: the IsotrInfWind (wind star) block is currently empty, both before and
+# after the 2025-11 code cleanup -- only require that the other star is built.
+assert valid_polys > 0, "No star geometry was built"
+
+# rebuild pass: exercises BuildStars() deleting and recreating the star
+# polydata while the multi-block output still holds references
+reader.UpdatePipeline()
+output1b = vtk_reader.GetOutputDataObject(1)
+assert output1b.GetNumberOfBlocks() == num_stars, "star count changed on rebuild"
+for i in range(num_stars):
+    star = output1b.GetDataSet(i)
+    polys = 0 if star is None else star.GetNumberOfPolys()
+    assert polys == star_polys[i], \
+        f"star {i} geometry changed on rebuild: {polys} != {star_polys[i]}"
+
+print("\n=== ALL TESTS PASSED ===")

@@ -57,7 +57,6 @@ int main(int argc, char **argv)
   reader->SetFileName(argv[1]);
   reader->DebugOn();
   reader->DataScaleOn();
-  reader->LogDataOn();
   reader->UpdateInformation();
   reader->SetPointArrayStatus("Density", 1);
   auto NbOfLevels = reader->GetNumberOfLevels();
@@ -77,22 +76,13 @@ int main(int argc, char **argv)
 #ifdef ALL
   VTK_CREATE(vtkContourFilter, contour);
   contour->SetInputConnection(0, reader->GetOutputPort(0));
-#ifdef LOG
-  contour->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Log10(Density) [N/cm^3]");
-  contour->GenerateValues(9, 5.46, 7.63);
-#else
   contour->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Density [N/cm^3]");
   contour->GenerateValues(16, 6876, 6876349);
-#endif
   contour->ComputeScalarsOn();
   contour->DebugOff();
 
   VTK_CREATE(vtkLookupTable, lut);
-#ifdef LOG
-  lut->SetTableRange(5.46, 7.63); // 3.83, 6.83);
-#else
   lut->SetTableRange(6876, 6876349);
-#endif
   lut->SetHueRange(0.66,0.0);
   lut->SetNumberOfTableValues(256);
   lut->Build();
@@ -149,7 +139,7 @@ int main(int argc, char **argv)
   cutterMapper->SetLookupTable(lut);
   cutterMapper->UseLookupTableScalarRangeOn();
   cutterMapper->SetScalarModeToUsePointData();
-  cutterMapper->SelectColorArray("Log10(Density)");
+  cutterMapper->SelectColorArray("Density [N/cm^3]");
   //cutterMapper->ScalarVisibilityOff();
 
   VTK_CREATE(vtkActor, cutterActor);

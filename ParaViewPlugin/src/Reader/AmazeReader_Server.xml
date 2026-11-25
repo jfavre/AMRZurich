@@ -49,17 +49,6 @@
         <Documentation>This property specifies the desired level of resolution
         that will be visible.</Documentation>
       </IntVectorProperty>
-     <IntVectorProperty 
-        name="LogData" 
-        command="SetLogData"
-        number_of_elements="1"
-        default_values="0"
-        label="Compute Log10">
-      <BooleanDomain name="bool" />
-      <Documentation>
-            Will compute log10() of the standard variables (density, temperature, pressure)
-      </Documentation>
-     </IntVectorProperty>
 
      <IntVectorProperty 
         name="ShiftedGrid" 
@@ -151,7 +140,6 @@
           <Property name="NumBlocks"/>
           <Property name="EnableCaching"/>
           <Property name="Level"/>
-          <Property name="LogData"/>
           <Property name="ShiftedGrid"/>
           <Property name="LengthScale"/>
           <Property name="BoxLength"/>

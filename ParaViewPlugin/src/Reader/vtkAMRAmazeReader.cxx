@@ -1,115 +1,105 @@
 // SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
 // SPDX-License-Identifier: BSD-3-Clause
 #include "vtkAMRAmazeReader.h"
-#include "vtkDataArraySelection.h"
-#include "vtkObjectFactory.h"
-#include "vtkOverlappingAMR.h"
-#include "vtkUniformGrid.h"
 
-#include "vtkPointData.h"
-#include "vtkPolyData.h"
+#include "vtkAMRAmazeReaderInternal.h"
+
+#include "vtkDataArraySelection.h"
 #include "vtkDoubleArray.h"
+#include "vtkFieldData.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMultiBlockDataSet.h"
+#include "vtkNew.h"
+#include "vtkObjectFactory.h"
+#include "vtkOverlappingAMR.h"
+#include "vtkPointData.h"
+#include "vtkPolyData.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
+#include "vtkUniformGrid.h"
 
 #include <algorithm>
 #include <cassert>
-#include <cfloat>
-#include <map>
-#include <vector>
+#include <cstring>
 #include <iostream>
-
-#include "vtkAMRAmazeReaderInternal.h"
+#include <vector>
 
 vtkStandardNewMacro(vtkAMRAmazeReader);
 
 //------------------------------------------------------------------------------
 vtkAMRAmazeReader::vtkAMRAmazeReader()
 {
-  this->nbstars = -1;
-
-  this->DataScaleOn();
-
-  //if(this->PointDataArraySelection == nullptr)
-    //this->PointDataArraySelection = vtkDataArraySelection::New();
   this->DebugOff();
-
   this->SetNumberOfInputPorts(0);
 
+  // Output port 0 holds the AMR structure, output port 1 holds the stars
   this->SetNumberOfOutputPorts(2);
-// this is for port number 1 which we do in all cases.
-  vtkMultiBlockDataSet *pd = vtkMultiBlockDataSet::New();
-  pd->ReleaseData();
-  this->GetExecutive()->SetOutputData(1, pd);
-  pd->Delete();
+  vtkMultiBlockDataSet* starsOutput = vtkMultiBlockDataSet::New();
+  starsOutput->ReleaseData();
+  this->GetExecutive()->SetOutputData(1, starsOutput);
+  starsOutput->Delete();
 
-  this->IsReady = false;
-// this is for port number 1 which we do in all cases.
   this->Internal = std::make_unique<vtkAMRAmazeReaderInternal>();
   this->Initialize();
 }
 
 //------------------------------------------------------------------------------
-vtkAMRAmazeReader::~vtkAMRAmazeReader()
-{
-  if(this->FileName != NULL)
-    {
-    delete [] this->FileName;
-    this->FileName = nullptr;
-    }
-}
+vtkAMRAmazeReader::~vtkAMRAmazeReader() = default;
 
+//------------------------------------------------------------------------------
 int vtkAMRAmazeReader::FillOutputPortInformation(int port, vtkInformation* info)
 {
-  if(port == 0)
+  if (port == 0)
+  {
     info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkOverlappingAMR");
-  if(port == 1)
+  }
+  else if (port == 1)
+  {
     info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkMultiBlockDataSet");
+  }
   return 1;
 }
 
+//------------------------------------------------------------------------------
 int vtkAMRAmazeReader::RequestInformation(vtkInformation* request,
-                  vtkInformationVector** inputVector,
-                  vtkInformationVector* outputVector)
+                                          vtkInformationVector** inputVector,
+                                          vtkInformationVector* outputVector)
 {
-  (void)request;
   if (!this->FileName)
   {
     // nothing to do until a file has been selected (ParaView triggers
     // information updates as soon as the reader proxy is created)
     return 1;
   }
-  
+
   vtkInformation* info = outputVector->GetInformationObject(0);
-  
+
   int status = vtkAMRBaseReader::RequestInformation(request, inputVector, outputVector);
-  
+
+  const double localTime = this->Internal->AMAZETime;
+  const double timeRange[2] = { localTime, localTime };
   info->Remove(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
   info->Remove(vtkStreamingDemandDrivenPipeline::TIME_RANGE());
-  double localTime = this->Internal->AMAZETime;
-  double timeRange[2] = {localTime, localTime};
   info->Set(vtkStreamingDemandDrivenPipeline::TIME_STEPS(), &localTime, 1);
   info->Set(vtkStreamingDemandDrivenPipeline::TIME_RANGE(), timeRange, 2);
-  
+
   return status;
 }
 
+//------------------------------------------------------------------------------
 int vtkAMRAmazeReader::RequestData(vtkInformation* request,
-                  vtkInformationVector** inputVector,
-                  vtkInformationVector* outputVector)
+                                   vtkInformationVector** inputVector,
+                                   vtkInformationVector* outputVector)
 {
   int status = vtkAMRBaseReader::RequestData(request, inputVector, outputVector);
-     
+
   // the first output holds the AMR structure
   vtkInformation* info0 = outputVector->GetInformationObject(0);
   vtkOverlappingAMR* amr = vtkOverlappingAMR::SafeDownCast(info0->Get(vtkDataObject::DATA_OBJECT()));
-  bool res = amr->CheckValidity();
-  
-  double Omega = this->Internal->FixedBinaryOrbit.Omega; // if read from file, should never be 0.0
-  if (Omega > 0.0)
-    {
+
+  const double omega = this->Internal->FixedBinaryOrbit.Omega; // if read from file, never 0.0
+  if (omega > 0.0)
+  {
     vtkNew<vtkDoubleArray> com;
     com->SetName("CenterOfMass");
     com->SetNumberOfComponents(3);
@@ -117,15 +107,18 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
     com->InsertNextValue(this->Internal->FixedBinaryOrbit.CenterofMass_y);
     com->InsertNextValue(this->Internal->FixedBinaryOrbit.CenterofMass_z);
     amr->GetFieldData()->AddArray(com);
-    vtkNew<vtkDoubleArray> omega;
-    omega->SetName("Omega");
-    omega->SetNumberOfComponents(1);
-    omega->InsertNextValue(this->Internal->FixedBinaryOrbit.Omega);
-    amr->GetFieldData()->AddArray(omega);
-    }
-  double Mean_Particle_Mass = this->Internal->thermodynamics_eos.Mean_Particle_Mass; // if read from file, should never be 0.0
-  if (Mean_Particle_Mass > 0.0)
-    {
+
+    vtkNew<vtkDoubleArray> omegaArray;
+    omegaArray->SetName("Omega");
+    omegaArray->SetNumberOfComponents(1);
+    omegaArray->InsertNextValue(omega);
+    amr->GetFieldData()->AddArray(omegaArray);
+  }
+
+  // if read from file, never 0.0
+  const double meanParticleMass = this->Internal->thermodynamics_eos.Mean_Particle_Mass;
+  if (meanParticleMass > 0.0)
+  {
     vtkNew<vtkDoubleArray> eos;
     eos->SetName("Thermodynamics_EOS");
     eos->SetNumberOfComponents(5);
@@ -133,72 +126,48 @@ int vtkAMRAmazeReader::RequestData(vtkInformation* request,
     eos->InsertNextValue(this->Internal->thermodynamics_eos.Specific_Gasconstant);
     eos->InsertNextValue(this->Internal->thermodynamics_eos.Scaled_Specific_Gasconstant);
     eos->InsertNextValue(this->Internal->thermodynamics_eos.Scale_Factor);
-    eos->InsertNextValue(this->Internal->thermodynamics_eos.Mean_Particle_Mass);
+    eos->InsertNextValue(meanParticleMass);
     amr->GetFieldData()->AddArray(eos);
-    }
-   
-   
-  // the second output holds the Stars Polydata
-  vtkInformation* info = outputVector->GetInformationObject(1);
-  vtkMultiBlockDataSet* output2 = vtkMultiBlockDataSet::SafeDownCast(info->Get(vtkDataObject::DATA_OBJECT()));
-  if(1) // only MPI task 0 reads the stars
-  {
-    int local_nb_stars = vtkAMRAmazeReader::LoadStars(output2);
-    if(local_nb_stars != this->nbstars)
-    {
-      std::cerr << "something went wrong counting stars\n";
-      std::cerr << __LINE__ << "nb_stars = " << local_nb_stars << endl;
-    }
-    if(this->nbstars > 0) // meta data to be used in programmable filters
-      {
-      for(auto s=0; s < this->nbstars; s++)
-        {
-        vtkNew<vtkDoubleArray> stars;
-        stars->SetName(this->Internal->newstars[s].InteractionModel);
-        stars->SetNumberOfComponents(1+3+3);
-        stars->InsertNextValue(this->Internal->newstars[s].Mass);
-        stars->InsertNextValue(this->Internal->newstars[s].Position[0]);
-        stars->InsertNextValue(this->Internal->newstars[s].Position[1]);
-        stars->InsertNextValue(this->Internal->newstars[s].Position[2]);
-        stars->InsertNextValue(this->Internal->newstars[s].Velocity[0]);
-        stars->InsertNextValue(this->Internal->newstars[s].Velocity[1]);
-        stars->InsertNextValue(this->Internal->newstars[s].Velocity[2]);
-        amr->GetFieldData()->AddArray(stars);
-        }
-      }
   }
-  else
+
+  // the second output holds the stars poly data
+  vtkInformation* info1 = outputVector->GetInformationObject(1);
+  vtkMultiBlockDataSet* starsOutput =
+    vtkMultiBlockDataSet::SafeDownCast(info1->Get(vtkDataObject::DATA_OBJECT()));
+
+  const int local_nb_stars = this->LoadStars(starsOutput);
+  if (local_nb_stars != this->NumberOfStars)
   {
-    for(auto i=0; i < this->nbstars; i++)
-      output2->SetBlock(i, nullptr);
+    std::cerr << "something went wrong counting stars: expected " << this->NumberOfStars
+              << ", read " << local_nb_stars << "\n";
   }
+
+  // star properties published as FieldData to be used in programmable filters
+  const int nbStarInfos =
+    std::min(this->NumberOfStars, static_cast<int>(this->Internal->newstars.size()));
+  for (int s = 0; s < nbStarInfos; s++)
+  {
+    const newstar& star = this->Internal->newstars[s];
+    vtkNew<vtkDoubleArray> starInfo;
+    starInfo->SetName(star.InteractionModel);
+    starInfo->SetNumberOfComponents(1 + 3 + 3);
+    starInfo->InsertNextValue(star.Mass);
+    starInfo->InsertNextValue(star.Position[0]);
+    starInfo->InsertNextValue(star.Position[1]);
+    starInfo->InsertNextValue(star.Position[2]);
+    starInfo->InsertNextValue(star.Velocity[0]);
+    starInfo->InsertNextValue(star.Velocity[1]);
+    starInfo->InsertNextValue(star.Velocity[2]);
+    amr->GetFieldData()->AddArray(starInfo);
+  }
+
   return status;
 }
 
-vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname ) const
+//------------------------------------------------------------------------------
+vtkTypeBool vtkAMRAmazeReader::CanReadFile(const char* fname) const
 {
-  return H5Fis_hdf5(fname) > 0;
-  /*
-  if (! fname )
-    return false;
-
-  cout << "vtkAMRAmazeReader::CanReadFile\n";
-  hid_t f_id = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
-  hid_t root_id = H5Gopen(f_id, "/", H5P_DEFAULT);
-  if(H5Lexists(root_id, "/Grid Info", H5P_DEFAULT))
-    {
-      H5Gclose(root_id);
-      H5Fclose(f_id);
-      return true;
-    }
-  else
-    {
-    H5Gclose(root_id);
-    H5Fclose(f_id);
-    return false;
-    }
-  return true;
-  */
+  return fname && H5Fis_hdf5(fname) > 0;
 }
 
 //------------------------------------------------------------------------------
@@ -212,23 +181,19 @@ void vtkAMRAmazeReader::SetFileName(const char* fileName)
 {
   assert("pre: Internal Amaze Reader is nullptr" && (this->Internal != nullptr));
 
-  if (fileName && strcmp(fileName, "") != 0 &&
-    ((this->FileName == nullptr) || strcmp(fileName, this->FileName) != 0))
+  if (fileName && *fileName != '\0' &&
+      (this->FileName == nullptr || strcmp(fileName, this->FileName) != 0))
   {
-    if (this->FileName)
-    {
-      delete[] this->FileName;
-      this->FileName = nullptr;
-      this->Internal->SetFileName(nullptr);
-    }
+    delete[] this->FileName;
+    this->FileName = nullptr;
+    this->Internal->SetFileName(nullptr);
 
-    this->FileName = new char[strlen(fileName) + 1];
+    const size_t length = strlen(fileName);
+    this->FileName = new char[length + 1];
     strcpy(this->FileName, fileName);
-    this->FileName[strlen(fileName)] = '\0';
 
     this->IsReady = true;
     this->Internal->SetFileName(this->FileName);
-    //this->LoadedMetaData = false;
 
     this->SetUpDataArraySelections();
     this->InitializeArraySelections();
@@ -241,8 +206,10 @@ void vtkAMRAmazeReader::SetFileName(const char* fileName)
 void vtkAMRAmazeReader::ReadMetaData()
 {
   assert("pre: Internal Amaze Reader is nullptr" && (this->Internal != nullptr));
-  if(this->Internal->ReadMetaData() >= 0)
+  if (this->Internal->ReadMetaData() >= 0)
+  {
     this->LoadedMetaData = true;
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -255,12 +222,7 @@ int vtkAMRAmazeReader::GetBlockLevel(int blockIdx)
 int vtkAMRAmazeReader::GetNumberOfBlocks()
 {
   assert("pre: Internal Amaze Reader is nullptr" && (this->Internal != nullptr));
-  if (!this->IsReady)
-  {
-    return 0;
-  }
-  
-  return Internal->NumberOfGrids;
+  return this->IsReady ? this->Internal->NumberOfGrids : 0;
 }
 
 //------------------------------------------------------------------------------
@@ -271,93 +233,96 @@ int vtkAMRAmazeReader::GetNumberOfLevels()
   {
     return 0;
   }
-  
-  if(!this->LoadedMetaData)
+
+  if (!this->LoadedMetaData)
   {
     this->Internal->ReadMetaData();
     this->LoadedMetaData = true;
-    //std::cerr << __LINE__ << " :vtkAMRAmazeReader::GetNumberOfLevels() setting LoadedMetaData(true)\n";
   }
 
-  return (this->Internal->NumberOfLevels);
+  return this->Internal->NumberOfLevels;
 }
 
 //------------------------------------------------------------------------------
 int vtkAMRAmazeReader::FillMetaData()
 {
-  if(this->nbstars == -1) // has not ben executed yet
+  if (this->NumberOfStars != -1) // the metadata has already been read
   {
-  this->nbstars = this->Internal->ReadMetaData();
+    return 1;
+  }
+
+  this->NumberOfStars = this->Internal->ReadMetaData();
   this->SetUpDataArraySelections();
 
   std::vector<unsigned int> blocksPerLevel;
   blocksPerLevel.reserve(this->GetNumberOfLevels());
-  for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
+  for (int levelId = 0; levelId < this->GetNumberOfLevels(); levelId++)
   {
-    //std::cout << "Level " <<  levelId << " has " << this->Internal->GridsPerLevels(levelId) << " blocks\n";
     blocksPerLevel.push_back(this->Internal->GridsPerLevels(levelId));
   }
+
   this->Metadata->Initialize(blocksPerLevel);
   this->Metadata->SetOrigin(this->Internal->Grids[0].layout.origin);
-  if(this->Internal->Dimensionality == 2)
+  if (this->Internal->Dimensionality == 2)
+  {
     this->Metadata->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XY_PLANE);
+  }
   else
+  {
     this->Metadata->SetGridDescription(vtkStructuredData::VTK_STRUCTURED_XYZ_GRID);
+  }
 
   double spacing[3];
-  int globalBoxId = 0, refratio=-1;
-  for (int levelId=0; levelId < this->GetNumberOfLevels(); levelId++)
+  int globalBoxId = 0;
+  for (int levelId = 0; levelId < this->GetNumberOfLevels(); levelId++)
   {
     this->Internal->GetSpacing(levelId, spacing);
     this->Metadata->SetSpacing(levelId, spacing);
-    if (levelId == this->GetNumberOfLevels() - 1)  // we are at finest level of refinement
-    {
-      refratio = 1;
-    }
-    else
-    {
-      refratio = this->Internal->Levels[levelId+1].RefRatio; // note the offset by +1
-    }
+
+    // the refinement ratio of a level is the ratio towards the next finer level;
+    // the finest level gets 1
+    const int refratio = levelId == this->GetNumberOfLevels() - 1
+      ? 1
+      : this->Internal->Levels[levelId + 1].RefRatio;
     this->Metadata->SetRefinementRatio(levelId, refratio);
 
-    //std::cerr << "Level " <<  levelId << ": RefRatio = " << refratio << ", spacing = [ " << spacing[0] << ", " << spacing[1] <<  ", " << spacing[2] << "]\n";
+    //std::cerr << "Level " <<  levelId << ": RefRatio = " << refratio
+    //            << ", spacing = [ " << spacing[0] << ", " << spacing[1] <<  ", " << spacing[2] << "]\n";
 
-    for (auto GridId=0; GridId < this->Internal->GridsPerLevels(levelId); GridId++)
+    const int nbBlocks = this->Internal->GridsPerLevels(levelId);
+    for (int gridId = 0; gridId < nbBlocks; gridId++)
     {
-      this->Metadata->SetAMRBox(levelId, GridId, this->Internal->Grids[globalBoxId].amrbox);
-      this->Metadata->SetAMRBlockSourceIndex(levelId, GridId, globalBoxId);
+      this->Metadata->SetAMRBox(levelId, gridId, this->Internal->Grids[globalBoxId].amrbox);
+      this->Metadata->SetAMRBlockSourceIndex(levelId, gridId, globalBoxId);
       globalBoxId++;
     }
   }
 
-  vtkDebugMacro(<< "\nDimensionality: "     << this->Internal->Dimensionality
+  vtkDebugMacro(<< "\nDimensionality: " << this->Internal->Dimensionality
                 << "\nNumberOfComponents: " << this->Internal->NumberOfComponents
-                << "\nNumberOfLevels: "     << this->GetNumberOfLevels()
-                << "\nNumberOfBlocks: "     << this->GetNumberOfBlocks()
-                );
+                << "\nNumberOfLevels: " << this->GetNumberOfLevels()
+                << "\nNumberOfBlocks: " << this->GetNumberOfBlocks());
 
   this->Metadata->GenerateParentChildInformation();
-  double localTime = this->Internal->AMAZETime;
-  this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), localTime);
+  this->Metadata->GetInformation()->Set(vtkDataObject::DATA_TIME_STEP(), this->Internal->AMAZETime);
 
   return 1;
-  }
-  else
-    return 1;
 }
 
 //------------------------------------------------------------------------------
 vtkUniformGrid* vtkAMRAmazeReader::GetAMRGrid(int blockIdx)
 {
-  //std::cerr << __LINE__ << " :vtkAMRAmazeReader::GetAMRGrid(" <<  blockIdx << ")\n";
   return this->Internal->GetAMRGrid(blockIdx);
 }
 
 //------------------------------------------------------------------------------
 void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block, const char* field)
 {
-  //std::cerr << __LINE__ << " :GetAMRGridPointData(" <<  blockIdx << ", " << field << ")\n";
   vtkDoubleArray* scalars = this->Internal->ReadVisItVar(blockIdx, field);
+  if (!scalars)
+  {
+    return;
+  }
 
   block->GetPointData()->AddArray(scalars);
   if (!block->GetPointData()->GetScalars())
@@ -370,37 +335,31 @@ void vtkAMRAmazeReader::GetAMRGridPointData(int blockIdx, vtkUniformGrid* block,
 //------------------------------------------------------------------------------
 void vtkAMRAmazeReader::SetUpDataArraySelections()
 {
-  for(auto i=0; i < this->Internal->NumberOfComponents; i++)
+  for (int i = 0; i < this->Internal->NumberOfComponents; i++)
   {
-    // std::cerr << __LINE__ << "PointDataArraySelection->AddArray(" <<  this->Internal->Labels[i].label << ")\n";
-    // all arrays are added as disabled.
-    this->PointDataArraySelection->AddArray((const char *)this->Internal->Labels[i].label, false);
-    int count = strcspn((const char *)this->Internal->Labels[i].unit, " "); // count how many characters in unit different than " "
+    // all arrays are added as disabled
+    this->PointDataArraySelection->AddArray(this->Internal->Labels[i].label, false);
+
+    // keep only the first word of the unit string
+    const int count = strcspn(this->Internal->Labels[i].unit, " ");
     this->Internal->Labels[i].unit[count] = '\0';
   }
   this->Internal->MakeVariableNames();
 }
 
-int vtkAMRAmazeReader::LoadStars(vtkMultiBlockDataSet* SpherSymStars)
+//------------------------------------------------------------------------------
+int vtkAMRAmazeReader::LoadStars(vtkMultiBlockDataSet* starsDataSet)
 {
   this->Internal->BuildStars();
-  int nb_stars = this->Internal->NumberOfSphericallySymmetricStars + this->Internal->NumberOfAxisSymmetricStars;
-  for(auto i=0; i < nb_stars; i++)
+
+  const int nbStars =
+    this->Internal->NumberOfSphericallySymmetricStars + this->Internal->NumberOfAxisSymmetricStars;
+  for (int i = 0; i < nbStars; i++)
   {
-    SpherSymStars->SetBlock(i, this->Internal->Stars[i]);
-    SpherSymStars->GetMetaData((unsigned int)i)->Set(vtkCompositeDataSet::NAME(), this->Internal->Stars[i]->GetFieldData()->GetArray(0)->GetName());
+    starsDataSet->SetBlock(i, this->Internal->Stars[i]);
+    starsDataSet->GetMetaData(i)->Set(vtkCompositeDataSet::NAME(),
+                                      this->Internal->Stars[i]->GetFieldData()->GetArray(0)->GetName());
   }
 
-  return nb_stars;
-}
-
-// Get the second output which contains the stars
-//vtkPolyData* vtkAMRAmazeReader::GetStarsOutput()
-vtkMultiBlockDataSet* vtkAMRAmazeReader::GetStarsOutput()
-{
-  if (this->GetNumberOfOutputPorts() < 3)
-  {
-    return nullptr;
-  }
-  return vtkMultiBlockDataSet::SafeDownCast(this->GetExecutive()->GetOutputData(2));
+  return nbStars;
 }

@@ -23,7 +23,6 @@ int main(int argc, char **argv)
   reader->SetFileName(argv[1]);
   reader->DebugOn();
   reader->DataScaleOn();
-  reader->LogDataOff();
   reader->SetPointArrayStatus("Density", 1);
 
   reader->DebugOn();
